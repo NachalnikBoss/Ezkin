@@ -1325,13 +1325,23 @@ function HUD.pill(order, iconName, text)
     })
     local ic = watermarkIcon(f, iconName, WHITE)
     ic.LayoutOrder = 1
+    ic.ZIndex = 1001
     local lbl = new("TextLabel", {
         Size = UDim2.fromOffset(0, 26), AutomaticSize = Enum.AutomaticSize.X, BackgroundTransparency = 1,
         Font = Enum.Font.GothamMedium, TextSize = 12, TextColor3 = WHITE, Text = text, LayoutOrder = 2, Parent = f,
     })
+    lbl.ZIndex = 1001
     return f, lbl
 end
 HUD.wmNamePill = HUD.pill(1, "code", "Hiruku")
+HUD.wmNamePill.Active = true
+HUD.wmNamePill.Selectable = true
+HUD.wmNamePill.ZIndex = 1000
+HUD.wmNamePill.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        WIN.setOpen(not WIN.menuOpen)
+    end
+end)
 HUD.wmUserPill, HUD.wmUserLbl = HUD.pill(2, "user", LP.DisplayName)
 HUD.wmFpsPill, HUD.wmFpsLbl = HUD.pill(3, "activity", "60 fps")
 HUD.wmPingPill, HUD.wmPingLbl = HUD.pill(4, "wifi", "0 ms")
