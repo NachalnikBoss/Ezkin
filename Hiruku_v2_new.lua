@@ -1,5 +1,5 @@
 --[[
-    HIRUKU v2 — visual suite for MM2
+    HIRUKU v8 — visual suite for MM2
     Client-side cosmetics only (only you can see them).
 
     Menu:  RightShift, or tap the "Hiruku" HUD.pill at the top of the screen.
@@ -20,6 +20,8 @@ local SoundService = game:GetService("SoundService")
 local HttpService = game:GetService("HttpService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local Debris = game:GetService("Debris")
+local GuiService = game:GetService("GuiService")
+local ContentProvider = game:GetService("ContentProvider")
 
 local LP = Players.LocalPlayer
 local WHITE, BLACK = Color3.new(1, 1, 1), Color3.new(0, 0, 0)
@@ -168,11 +170,11 @@ local HUD, WIN = {}, {}
 local PlayerGui = LP:WaitForChild("PlayerGui")
 local gui = new("ScreenGui", {
     Name = "Hiruku", ResetOnSpawn = false, IgnoreGuiInset = true,
-    ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 9999, Parent = PlayerGui,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 2147483000, Parent = PlayerGui,
 })
 local hud = new("ScreenGui", {
     Name = "HirukuHUD", ResetOnSpawn = false, IgnoreGuiInset = true,
-    ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 9998, Parent = PlayerGui,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 2147482999, Parent = PlayerGui,
 })
 local fxFolder = new("Folder", { Name = "HirukuFX", Parent = workspace })
 
@@ -1395,13 +1397,31 @@ function HUD.setTargetInfo(plr, show)
     if show and plr and plr.Character then
         if HUD.targetPlayer ~= plr then
             HUD.targetPlayer = plr
-            HUD.targetAvatar.Image = "rbxthumb://type=AvatarHeadShot&id=" .. tostring(plr.UserId) .. "&w=150&h=150"
+            HUD.targetThumb = ""
+            HUD.targetAvatar.Image = ""
             HUD.targetAvatar.ImageTransparency = 0
+            local uid = tostring(plr.UserId)
+            local fallback = "rbxthumb://type=AvatarHeadShot&id=" .. uid .. "&w=150&h=150"
+            HUD.targetAvatar.Image = fallback
             task.spawn(function()
-                local ok, img, ready = pcall(function() return Players:GetUserThumbnailAsync(plr.UserId, Enum.ThumbnailType.AvatarHeadShot, Enum.ThumbnailSize.Size150x150) end)
-                if ok and img and img ~= "" and HUD.targetPlayer == plr and HUD.targetAvatar.Parent then
-                    HUD.targetAvatar.Image = img
-                    HUD.targetAvatar.ImageTransparency = 0
+                local sources = {
+                    {Enum.ThumbnailType.AvatarHeadShot, Enum.ThumbnailSize.Size150x150},
+                    {Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150},
+                    {Enum.ThumbnailType.AvatarBust, Enum.ThumbnailSize.Size150x150},
+                }
+                for _, spec in ipairs(sources) do
+                    if HUD.targetPlayer ~= plr or not HUD.targetAvatar.Parent then return end
+                    local ok, img, ready = pcall(function()
+                        return Players:GetUserThumbnailAsync(plr.UserId, spec[1], spec[2])
+                    end)
+                    if ok and img and img ~= "" then
+                        HUD.targetThumb = img
+                        HUD.targetAvatar.Image = img
+                        HUD.targetAvatar.ImageTransparency = 0
+                        pcall(function() ContentProvider:PreloadAsync({HUD.targetAvatar}) end)
+                        if ready then return end
+                    end
+                    task.wait(0.08)
                 end
             end)
         end
@@ -2713,50 +2733,62 @@ function WIN.setOpen(open)
 end
 
 -- launcher pill
+local launcherGui = gui
+local function launcherMetrics()
+    local v = cam().ViewportSize
+    local touch = UIS.TouchEnabled and not UIS.KeyboardEnabled
+    local compact = math.min(v.X, v.Y) < 620
+    local scale = math.clamp(math.min(v.X / 900, v.Y / 700), 0.78, 1.05)
+    if touch then scale = math.clamp(math.min(v.X / 520, v.Y / 900), 0.82, 1.0) end
+    if compact then scale = math.min(scale, 0.9) end
+    local insetY = 0
+    pcall(function()
+        local topLeft = GuiService:GetGuiInset()
+        insetY = topLeft.Y
+    end)
+    local top = math.max(insetY + (touch and 7 or 8), 48)
+    local side = touch and 12 or 14
+    local w = touch and 108 or 118
+    local h = touch and 34 or 36
+    return scale, top, side, w, h
+end
 WIN.launcher = new("TextButton", {
-    Name = "Launcher", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 88), Size = UDim2.fromOffset(118, 36),
-    BackgroundColor3 = BLACK, BackgroundTransparency = 0.18, Text = "", AutoButtonColor = false, Active = true, Visible = true, ZIndex = 100, Parent = gui,
+    Name = "Launcher", AnchorPoint = Vector2.new(0, 0), BackgroundColor3 = BLACK, BackgroundTransparency = 0.12,
+    Text = "", AutoButtonColor = false, Active = true, Visible = true, ZIndex = 1000, Parent = launcherGui,
 })
 corner(WIN.launcher, 18)
-WIN.launcherStroke = stroke(WIN.launcher, State.accentColor, 0.55, 1.4)
+WIN.launcherStroke = stroke(WIN.launcher, State.accentColor, 0.48, 1.5)
 WIN.lIc = icon(WIN.launcher, "eye", 15, WHITE)
-WIN.lIc.Position = UDim2.new(0, 14, 0.5, -7)
-WIN.lIc.ZIndex = 101
+WIN.lIc.ZIndex = 1001
+WIN.lIc.AnchorPoint = Vector2.new(0, 0.5)
 new("TextLabel", {
-    BackgroundTransparency = 1, Position = UDim2.fromOffset(34, 0), Size = UDim2.new(1, -40, 1, 0), Text = "Hiruku", Font = Enum.Font.GothamBold,
-    TextSize = 14, TextColor3 = WHITE, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 101, Parent = WIN.launcher,
+    Name = "Title", BackgroundTransparency = 1, Text = "Hiruku", Font = Enum.Font.GothamBold, TextSize = 14, TextColor3 = WHITE,
+    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 1001, Parent = WIN.launcher,
 })
-
--- dragging (window via top bar, launcher via itself)
-function WIN.draggable(handle, target, onClick)
-    local drag, moved, origin, startPos = false, false, nil, nil
-    bind(handle.InputBegan, function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            drag, moved = true, false
-            origin, startPos = input.Position, target.Position
-            local c
-            c = input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    drag = false
-                    c:Disconnect()
-                    if onClick and not moved then onClick() end
-                end
-            end)
-        end
-    end)
-    bind(UIS.InputChanged, function(input)
-        if drag and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local d = input.Position - origin
-            if d.Magnitude > 5 then moved = true end
-            target.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
-        end
-    end)
+function WIN.updateLauncher()
+    if not WIN.launcher or not WIN.launcher.Parent then return end
+    local scale, top, side, w, h = launcherMetrics()
+    WIN.launcher.Position = UDim2.fromOffset(side, top)
+    WIN.launcher.Size = UDim2.fromOffset(w * scale, h * scale)
+    WIN.lIc.Size = UDim2.fromOffset(15 * scale, 15 * scale)
+    WIN.lIc.Position = UDim2.fromOffset(12 * scale, (h * scale - 15 * scale) / 2)
+    local title = WIN.launcher:FindFirstChild("Title")
+    if title then
+        title.Position = UDim2.fromOffset(34 * scale, 0)
+        title.Size = UDim2.new(1, -42 * scale, 1, 0)
+        title.TextSize = 14 * scale
+    end
 end
-WIN.draggable(WIN.topbar, WIN.win)
-WIN.draggable(WIN.launcher, WIN.launcher, function() WIN.setOpen(not WIN.menuOpen) end)
+WIN.updateLauncher()
+bind(cam():GetPropertyChangedSignal("ViewportSize"), WIN.updateLauncher)
+bind(UIS:GetPropertyChangedSignal("TouchEnabled"), WIN.updateLauncher)
+bind(UIS:GetPropertyChangedSignal("KeyboardEnabled"), WIN.updateLauncher)
+bind(WIN.launcher.MouseButton1Click, function() WIN.setOpen(not WIN.menuOpen) end)
 WIN.launcher:GetPropertyChangedSignal("Visible"):Connect(function()
     if not WIN.launcher.Visible then WIN.launcher.Visible = true end
 end)
+
+-- keep the launcher fixed near the device top edge; it is not draggable
 bind(UIS.InputBegan, function(i, gp)
     if not gp and i.KeyCode == Enum.KeyCode.RightShift then WIN.setOpen(not WIN.menuOpen) end
 end)
