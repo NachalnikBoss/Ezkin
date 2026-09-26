@@ -117,6 +117,9 @@ local Defaults = {
     aura = false, auraRate = 30, auraColor = WHITE,
     glow = false, glowFill = 0.75, glowColor = WHITE,
     toolGlow = false,
+    targetEsp = false, targetMode = "Box + Name", targetColor = C.ice, targetName = true, targetDistance = true, targetHealth = true,
+    chams = false, chamsMode = "Outline", chamsColor = C.rose, chamsPulse = false, chamsTransparency = 0.45,
+    jumpCircle = false, jumpCircleSize = 3.2, jumpCircleThickness = 0.12, jumpCircleColor = C.ice, jumpCircleRainbow = true, jumpCirclePulse = true,
     -- model
     mat = "Off", skinColor = false, skinCol = C.silver, rainbowSkin = false, ghost = 0, headless = false,
     -- wings
@@ -136,6 +139,9 @@ local Defaults = {
     sun = false, sunInt = 0.15, dof = false, dofFar = 0.25, blur = false, blurSize = 6,
     const = false, constCount = 10, constTwinkle = true, constColor = WHITE,
     fireflies = false, flyColor = Color3.fromRGB(255, 240, 160), snow = false, snowRate = 120, dust = false,
+    worldGrid = false, worldGridSize = 22, worldGridColor = C.ice, worldGridPulse = true,
+    worldPulse = false, worldPulseRate = 2.2, worldPulseColor = C.violet,
+    worldShards = false, worldShardCount = 12, worldShardColor = C.rose, worldShardSpeed = 0.8,
     -- misc
     music = false, musicId = "", musicVol = 0.6, musicLoop = true,
     -- settings
@@ -167,18 +173,21 @@ local Glyphs = {
     eye = "◉", ["moon-star"] = "☾", feather = "✦", music = "♪", settings = "⚙", search = "⌕", save = "▣",
     user = "●", ["chevron-down"] = "▾", play = "▶", pause = "❚❚", square = "■", ["rotate-cw"] = "↻",
     code = "</>", activity = "≈", wifi = "≋", clock = "◔", power = "⏻", download = "↓", upload = "↑",
+    target = "◎", shield = "◇", zap = "ϟ", circle = "○", layers = "▤", sparkles = "✧", scan = "⌗", grid = "▦",
 }
 local iconTargets = setmetatable({}, { __mode = "k" })
 local Lucide
 
 local function applyIcon(img, name)
+    local g = img:FindFirstChild("Glyph")
+    if g then g.Visible = true end
+    img.Image = ""
     if not Lucide then return end
     local ok, asset = pcall(Lucide.GetAsset, name, 48)
-    if ok and asset then
+    if ok and asset and asset.Url and asset.Url ~= "" then
         img.Image = asset.Url
         img.ImageRectSize = asset.ImageRectSize
         img.ImageRectOffset = asset.ImageRectOffset
-        local g = img:FindFirstChild("Glyph")
         if g then g.Visible = false end
     end
 end
@@ -515,7 +524,7 @@ end
 
 ---------------------------------------------------------------- subjects: real character + preview clone
 local function newSubject(preview)
-    return { preview = preview, wing = {}, hat = {}, halo = {}, orbs = {}, ring = {}, parts = {}, orig = {}, feet = 3, applied = false }
+    return { preview = preview, wing = {}, hat = {}, halo = {}, orbs = {}, ring = {}, jump = {}, parts = {}, orig = {}, feet = 3, applied = false }
 end
 local Real, Prev = newSubject(false), newSubject(true)
 Real.holder = new("Folder", { Name = "Real", Parent = fxFolder })
@@ -553,7 +562,7 @@ end
 
 local function clearFX(subj)
     if subj.holder then subj.holder:ClearAllChildren() end
-    subj.wing, subj.hat, subj.halo, subj.orbs, subj.ring = {}, {}, {}, {}, {}
+    subj.wing, subj.hat, subj.halo, subj.orbs, subj.ring, subj.jump = {}, {}, {}, {}, {}, {}
 end
 
 -- wings ------------------------------------------------------
@@ -667,6 +676,11 @@ local function buildAccessories(subj)
         for i = 1, 36 do table.insert(subj.ring, { part = mkPart(subj, Vector3.new(0.18, 0.05, 0.5)), i = i, n = 36, inner = false }) end
         for i = 1, 24 do table.insert(subj.ring, { part = mkPart(subj, Vector3.new(0.14, 0.05, 0.4)), i = i, n = 24, inner = true }) end
     end
+    if State.jumpCircle and subj.root then
+        for i = 1, 48 do
+            table.insert(subj.jump or {}, { part = mkPart(subj, Vector3.new(State.jumpCircleThickness, 0.05, 0.42)), i = i, n = 48 })
+        end
+    end
 end
 
 local function hue(t, k, speed) return Color3.fromHSV((t * (speed or 0.2) + k) % 1, 0.5, 1) end
@@ -697,6 +711,20 @@ local function stepFX(subj, t, air)
             local a = t * State.orbSpeed + it.i / n * math.pi * 2
             it.part.Position = rp + Vector3.new(math.cos(a) * State.orbRadius, math.sin(a * 2 + it.i) * 0.9 + 0.3, math.sin(a) * State.orbRadius)
             it.part.Color = State.orbRainbow and hue(t, it.i / n) or State.orbColor
+        end
+    end
+    if subj.jump[1] then
+        local visible = State.jumpCircle and air and not subj.preview
+        local base = root.Position - Vector3.new(0, subj.feet - 0.05, 0)
+        local pulse = State.jumpCirclePulse and (1 + math.sin(t * 7) * 0.12) or 1
+        for _, it in ipairs(subj.jump) do
+            local a = it.i / it.n * math.pi * 2
+            local R = State.jumpCircleSize * pulse
+            local pos = base + Vector3.new(math.cos(a) * R, 0, math.sin(a) * R)
+            it.part.CFrame = CFrame.new(pos, pos + Vector3.new(-math.sin(a), 0, math.cos(a)))
+            it.part.Color = State.jumpCircleRainbow and hue(t, it.i / it.n, 0.25) or State.jumpCircleColor
+            it.part.Size = Vector3.new(State.jumpCircleThickness, 0.05, 0.42)
+            it.part.Transparency = visible and 0.05 or 1
         end
     end
     if subj.ring[1] then
@@ -763,7 +791,152 @@ rebuildAll = function()
     end
 end
 
--- real-character extras --------------------------------------
+local playerVisuals = {}
+local visualFolder = new("Folder", { Name = "HirukuPlayers", Parent = fxFolder })
+
+local function destroyPlayerVisual(plr)
+    local v = playerVisuals[plr]
+    if v then
+        if v.highlight then pcall(function() v.highlight:Destroy() end) end
+        if v.billboard then pcall(function() v.billboard:Destroy() end) end
+        playerVisuals[plr] = nil
+    end
+end
+
+local function playerRoleText(plr)
+    local role = plr:GetAttribute("Role")
+    if role then return tostring(role) end
+    local character = plr.Character
+    if character then
+        local rv = character:FindFirstChild("Role")
+        if rv and rv:IsA("StringValue") then return rv.Value end
+    end
+    return ""
+end
+
+local function updatePlayerVisual(plr, t)
+    if plr == LP or not plr.Character then
+        destroyPlayerVisual(plr)
+        return
+    end
+    local character = plr.Character
+    local root = character:FindFirstChild("HumanoidRootPart")
+    local hum = character:FindFirstChildOfClass("Humanoid")
+    if not root or not hum then
+        destroyPlayerVisual(plr)
+        return
+    end
+
+    local v = playerVisuals[plr]
+    if State.chams then
+        if not v then v = {} playerVisuals[plr] = v end
+        if not v.highlight or not v.highlight.Parent then
+            v.highlight = new("Highlight", {
+                Name = "HirukuChams", Adornee = character, Parent = visualFolder,
+                Enabled = true, DepthMode = Enum.HighlightDepthMode.Occluded,
+                FillColor = State.chamsColor, OutlineColor = WHITE,
+            })
+        end
+        local h = v.highlight
+        h.Adornee = character
+        h.DepthMode = Enum.HighlightDepthMode.Occluded
+        local pulse = State.chamsPulse and (0.5 + math.sin(t * 3) * 0.5) or 0
+        if State.chamsMode == "Outline" then
+            h.FillTransparency = 1
+            h.OutlineTransparency = 0.05
+        elseif State.chamsMode == "Fill" then
+            h.FillTransparency = math.clamp(State.chamsTransparency - pulse * 0.2, 0.05, 0.9)
+            h.OutlineTransparency = 0.2
+        elseif State.chamsMode == "Pulse" then
+            h.FillTransparency = math.clamp(0.72 - pulse * 0.55, 0.08, 0.8)
+            h.OutlineTransparency = math.clamp(0.75 - pulse * 0.7, 0.02, 0.8)
+        else
+            h.FillTransparency = 0.58
+            h.OutlineTransparency = 0
+        end
+        h.FillColor = State.chamsColor
+        h.OutlineColor = State.chamsPulse and hue(t, 0, 0.16) or WHITE
+    elseif v and v.highlight then
+        v.highlight:Destroy()
+        v.highlight = nil
+    end
+
+    if State.targetEsp then
+        if not v then v = {} playerVisuals[plr] = v end
+        if not v.billboard or not v.billboard.Parent then
+            v.billboard = new("BillboardGui", {
+                Name = "HirukuTarget", Adornee = root, Size = UDim2.fromOffset(180, 58),
+                StudsOffset = Vector3.new(0, 3.2, 0), AlwaysOnTop = false, MaxDistance = 300,
+                Parent = visualFolder,
+            })
+            v.box = new("Frame", {
+                AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+                Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Parent = v.billboard,
+            })
+            corner(v.box, 6)
+            v.stroke = stroke(v.box, State.targetColor, 0.15, 1.5)
+            v.name = new("TextLabel", {
+                BackgroundTransparency = 1, Position = UDim2.fromOffset(4, 2), Size = UDim2.new(1, -8, 0, 18),
+                Font = Enum.Font.GothamBold, TextSize = 12, TextColor3 = WHITE, TextXAlignment = Enum.TextXAlignment.Center,
+                TextTruncate = Enum.TextTruncate.AtEnd, Parent = v.box,
+            })
+            v.info = new("TextLabel", {
+                BackgroundTransparency = 1, Position = UDim2.fromOffset(4, 20), Size = UDim2.new(1, -8, 0, 18),
+                Font = Enum.Font.GothamMedium, TextSize = 10, TextColor3 = GRAY, TextXAlignment = Enum.TextXAlignment.Center,
+                TextTruncate = Enum.TextTruncate.AtEnd, Parent = v.box,
+            })
+            v.bar = new("Frame", {
+                Position = UDim2.fromOffset(14, 42), Size = UDim2.new(1, -28, 0, 4),
+                BackgroundColor3 = BLACK, BackgroundTransparency = 0.3, Parent = v.box,
+            })
+            corner(v.bar, 2)
+            v.fill = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = State.targetColor, BorderSizePixel = 0, Parent = v.bar })
+            corner(v.fill, 2)
+        end
+        v.billboard.Adornee = root
+        v.box.Visible = State.targetMode ~= "Name Only" or State.targetName
+        v.name.Visible = State.targetName
+        v.info.Visible = State.targetDistance or State.targetHealth
+        v.bar.Visible = State.targetHealth
+        v.stroke.Color = State.targetColor
+        v.name.Text = plr.DisplayName
+        local dist = (cam().CFrame.Position - root.Position).Magnitude
+        local bits = {}
+        if State.targetDistance then table.insert(bits, string.format("%dm", math.floor(dist + 0.5))) end
+        if State.targetHealth then table.insert(bits, string.format("%d HP", math.floor(hum.Health + 0.5))) end
+        local role = playerRoleText(plr)
+        if role ~= "" then table.insert(bits, role) end
+        v.info.Text = table.concat(bits, "  ·  ")
+        local hp = math.clamp(hum.Health / math.max(hum.MaxHealth, 1), 0, 1)
+        v.fill.Size = UDim2.fromScale(hp, 1)
+        v.fill.BackgroundColor3 = State.targetColor
+    elseif v and v.billboard then
+        v.billboard:Destroy()
+        v.billboard = nil
+    end
+
+    if not State.targetEsp and not State.chams then destroyPlayerVisual(plr) end
+end
+
+local function refreshPlayerVisuals()
+    for plr in pairs(playerVisuals) do
+        if plr.Parent ~= Players then destroyPlayerVisual(plr) end
+    end
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LP then updatePlayerVisual(plr, os.clock()) end
+    end
+end
+
+for _, plr in ipairs(Players:GetPlayers()) do
+    if plr ~= LP then
+        bind(plr.CharacterAdded, function() task.wait(0.15) updatePlayerVisual(plr, os.clock()) end)
+    end
+end
+bind(Players.PlayerAdded, function(plr)
+    bind(plr.CharacterAdded, function() task.wait(0.15) updatePlayerVisual(plr, os.clock()) end)
+end)
+bind(Players.PlayerRemoving, destroyPlayerVisual)
+
 local auraEm, glowHL, toolHL
 local trailStuff = {}
 local function setAura()
@@ -1113,7 +1286,7 @@ end
 ---------------------------------------------------------------- window
 -- Android/iOS (touch, no physical keyboard) get a tall single-column layout;
 -- desktop keeps the original side-by-side panel.
-WIN.mobile = UIS.TouchEnabled and not UIS.KeyboardEnabled
+WIN.mobile = false
 WIN.dimFrame = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = BLACK, BackgroundTransparency = 1, Visible = false, ZIndex = 1, Parent = gui })
 WIN.PANEL = Color3.fromRGB(8, 8, 10)
 
@@ -1228,6 +1401,7 @@ else
         Size = UDim2.fromOffset(WIN.WIN_W, WIN.WIN_H), BackgroundTransparency = 1, GroupTransparency = 1, Visible = false, ZIndex = 2, Parent = gui,
     })
     WIN.mScale = new("UIScale", { Parent = WIN.win })
+    WIN.mScale.Scale = math.clamp(math.min(workspace.CurrentCamera.ViewportSize.X / 920, workspace.CurrentCamera.ViewportSize.Y / 440), 0.62, 1)
 
     -- skin preview panel (left)
     WIN.pvPanel = new("Frame", {
@@ -1714,6 +1888,28 @@ WIN.Pages = {
             T("Glow Outline", "glow", setGlow, { S("Fill", "glowFill", 0, 1, 0.05, updateGlow), CL("Color", "glowColor", updateGlow) }),
             T("Tool Glow", "toolGlow"),
         } },
+        { name = "Players", features = {
+            T("Target ESP", "targetEsp", refreshPlayerVisuals, {
+                DD("Mode", "targetMode", { "Box + Name", "Name Only", "Info + Bar" }, refreshPlayerVisuals),
+                T("Name", "targetName", refreshPlayerVisuals),
+                T("Distance", "targetDistance", refreshPlayerVisuals),
+                T("Health", "targetHealth", refreshPlayerVisuals),
+                CL("Color", "targetColor", refreshPlayerVisuals),
+            }),
+            T("Chams", "chams", refreshPlayerVisuals, {
+                DD("Style", "chamsMode", { "Outline", "Fill", "Pulse", "Glass" }, refreshPlayerVisuals),
+                CL("Color", "chamsColor", refreshPlayerVisuals),
+                T("Pulse", "chamsPulse", refreshPlayerVisuals),
+                S("Transparency", "chamsTransparency", 0.05, 0.9, 0.05, refreshPlayerVisuals),
+            }),
+            T("Jump Circle", "jumpCircle", rebuildAll, {
+                S("Size", "jumpCircleSize", 1.2, 6, 0.1, rebuildAll),
+                S("Thickness", "jumpCircleThickness", 0.04, 0.3, 0.01),
+                T("Pulse", "jumpCirclePulse"),
+                T("Rainbow", "jumpCircleRainbow"),
+                CL("Color", "jumpCircleColor"),
+            }),
+        } },
         { name = "Model", features = {
             DD("Material", "mat", { "Off", "Neon", "ForceField", "Glass", "Ice", "Metal" }),
             T("Skin Color", "skinColor", nil, { CL("Color", "skinCol") }),
@@ -1740,6 +1936,22 @@ WIN.Pages = {
             T("Sun Rays", "sun", applyPost, { S("Intensity", "sunInt", 0, 0.6, 0.01, applyPost) }),
             T("Depth of Field", "dof", applyPost, { S("Far Blur", "dofFar", 0, 1, 0.05, applyPost) }),
             T("Blur", "blur", applyPost, { S("Size", "blurSize", 1, 30, 1, applyPost) }),
+        } },
+        { name = "World FX", features = {
+            T("Digital Ground Grid", "worldGrid", nil, {
+                S("Size", "worldGridSize", 8, 40, 1),
+                T("Pulse", "worldGridPulse"),
+                CL("Color", "worldGridColor"),
+            }),
+            T("Shockwave Rings", "worldPulse", nil, {
+                S("Rate", "worldPulseRate", 0.5, 5, 0.1),
+                CL("Color", "worldPulseColor"),
+            }),
+            T("Floating Shards", "worldShards", nil, {
+                S("Count", "worldShardCount", 4, 30, 1),
+                S("Speed", "worldShardSpeed", 0.1, 2, 0.05),
+                CL("Color", "worldShardColor"),
+            }),
         } },
         { name = "Ambience", features = {
             T("Constellations", "const", buildConst, { S("Count", "constCount", 3, 24, 1, buildConst), T("Twinkle", "constTwinkle"), CL("Color", "constColor") }),
@@ -2013,6 +2225,113 @@ bind(LP.CharacterRemoving, function()
 end)
 if LP.Character then onChar(LP.Character) end
 
+local worldFX = { grid = {}, shards = {}, pulses = {}, lastPulse = 0 }
+
+local function clearWorldFX()
+    for _, list in pairs(worldFX) do
+        if type(list) == "table" then
+            for _, obj in ipairs(list) do pcall(function() obj:Destroy() end) end
+            table.clear(list)
+        end
+    end
+end
+
+local function ensureWorldGrid()
+    if not State.worldGrid then
+        for _, p in ipairs(worldFX.grid) do p.Transparency = 1 end
+        return
+    end
+    local root = Real.root
+    if not root then return end
+    if #worldFX.grid == 0 then
+        local n = 9
+        for x = -n, n do
+            local p = new("Part", {
+                Anchored = true, CanCollide = false, CanTouch = false, CanQuery = false, CastShadow = false,
+                Material = Enum.Material.Neon, Size = Vector3.new(0.035, 0.035, State.worldGridSize * 2),
+                Transparency = 0.35, Parent = fxFolder,
+            })
+            table.insert(worldFX.grid, p)
+        end
+        for z = -n, n do
+            local p = new("Part", {
+                Anchored = true, CanCollide = false, CanTouch = false, CanQuery = false, CastShadow = false,
+                Material = Enum.Material.Neon, Size = Vector3.new(State.worldGridSize * 2, 0.035, 0.035),
+                Transparency = 0.35, Parent = fxFolder,
+            })
+            table.insert(worldFX.grid, p)
+        end
+    end
+    local size = State.worldGridSize
+    local center = Vector3.new(root.Position.X, root.Position.Y - Real.feet + 0.02, root.Position.Z)
+    local pulse = State.worldGridPulse and (0.3 + (math.sin(os.clock() * 2) + 1) * 0.12) or 0.35
+    local idx = 1
+    for x = -9, 9 do
+        local p = worldFX.grid[idx]
+        p.Size = Vector3.new(0.035, 0.035, size * 2)
+        p.CFrame = CFrame.new(center + Vector3.new(x * 2, 0, 0))
+        p.Color = State.worldGridColor
+        p.Transparency = pulse
+        idx += 1
+    end
+    for z = -9, 9 do
+        local p = worldFX.grid[idx]
+        p.Size = Vector3.new(size * 2, 0.035, 0.035)
+        p.CFrame = CFrame.new(center + Vector3.new(0, 0, z * 2))
+        p.Color = State.worldGridColor
+        p.Transparency = pulse
+        idx += 1
+    end
+end
+
+local function updateWorldShards(t)
+    if not State.worldShards or not Real.root then
+        for _, p in ipairs(worldFX.shards) do p.Transparency = 1 end
+        return
+    end
+    while #worldFX.shards < State.worldShardCount do
+        local p = new("Part", {
+            Anchored = true, CanCollide = false, CanTouch = false, CanQuery = false, CastShadow = false,
+            Material = Enum.Material.Neon, Size = Vector3.new(0.12, 1.4, 0.12),
+            Parent = fxFolder,
+        })
+        table.insert(worldFX.shards, p)
+    end
+    for i, p in ipairs(worldFX.shards) do
+        if i <= State.worldShardCount then
+            local a = t * State.worldShardSpeed + i * 2.399
+            local r = 8 + (i % 5) * 1.8
+            local y = 2.5 + math.sin(t * 1.3 + i) * 1.5 + (i % 4) * 0.8
+            local pos = Real.root.Position + Vector3.new(math.cos(a) * r, y, math.sin(a) * r)
+            p.CFrame = CFrame.new(pos) * CFrame.Angles(a * 0.7, a, a * 0.35)
+            p.Color = State.worldShardColor
+            p.Transparency = 0.12
+        else
+            p.Transparency = 1
+        end
+    end
+end
+
+local function updateWorldPulses(t)
+    if not State.worldPulse or not Real.root then
+        for _, p in ipairs(worldFX.pulses) do p.Transparency = 1 end
+        return
+    end
+    if t - worldFX.lastPulse > 1 / math.max(State.worldPulseRate, 0.1) then
+        worldFX.lastPulse = t
+        local p = new("Part", {
+            Shape = Enum.PartType.Cylinder, Anchored = true, CanCollide = false, CanTouch = false, CanQuery = false,
+            CastShadow = false, Material = Enum.Material.Neon, Color = State.worldPulseColor,
+            Size = Vector3.new(0.05, 1.2, 1.2), Transparency = 0.05,
+            CFrame = CFrame.new(Real.root.Position - Vector3.new(0, Real.feet - 0.08, 0)) * CFrame.Angles(0, 0, math.pi / 2),
+            Parent = fxFolder,
+        })
+        table.insert(worldFX.pulses, p)
+        tween(p, 1.4, { Size = Vector3.new(0.05, 14, 14), Transparency = 1 })
+        Debris:AddItem(p, 1.5)
+    end
+end
+
 ---------------------------------------------------------------- main loop
 local prevRot, tagsAcc = 0, 0
 local TagNames = {
@@ -2032,6 +2351,17 @@ bind(RunService.RenderStepped, function(dt)
         stepFX(Real, t, air)
         stepReal(dt, t)
     end
+
+    if State.targetEsp or State.chams then
+        HUD.playerVisualAcc = (HUD.playerVisualAcc or 0) + dt
+        if HUD.playerVisualAcc >= 0.12 then
+            HUD.playerVisualAcc = 0
+            refreshPlayerVisuals()
+        end
+    end
+    ensureWorldGrid()
+    updateWorldShards(t)
+    updateWorldPulses(t)
 
     if WIN.menuOpen and Prev.model then
         prevRot += dt * 0.7
@@ -2069,7 +2399,10 @@ unload = function()
     restoreWorld()
     if State.fovOn then cam().FieldOfView = origFov end
     if HUD.cursorHidden then UIS.MouseIconEnabled = true end
-    fxFolder:Destroy()
+    for plr in pairs(playerVisuals) do destroyPlayerVisual(plr) end
+    clearWorldFX()
+    pcall(function() visualFolder:Destroy() end)
+    pcall(function() fxFolder:Destroy() end)
     hud:Destroy()
     gui:Destroy()
     env.HirukuUnload = nil
