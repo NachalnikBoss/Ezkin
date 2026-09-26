@@ -168,11 +168,11 @@ local HUD, WIN = {}, {}
 local PlayerGui = LP:WaitForChild("PlayerGui")
 local gui = new("ScreenGui", {
     Name = "Hiruku", ResetOnSpawn = false, IgnoreGuiInset = true,
-    ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 50, Parent = PlayerGui,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 9999, Parent = PlayerGui,
 })
 local hud = new("ScreenGui", {
     Name = "HirukuHUD", ResetOnSpawn = false, IgnoreGuiInset = true,
-    ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 40, Parent = PlayerGui,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 9998, Parent = PlayerGui,
 })
 local fxFolder = new("Folder", { Name = "HirukuFX", Parent = workspace })
 
@@ -1378,7 +1378,7 @@ HUD.targetInfo = new("CanvasGroup", {
 })
 corner(HUD.targetInfo, 10)
 stroke(HUD.targetInfo, WHITE, 0.88)
-HUD.targetAvatar = new("ImageLabel", { Position = UDim2.fromOffset(9, 9), Size = UDim2.fromOffset(54, 54), BackgroundColor3 = WHITE, BackgroundTransparency = 0.9, Parent = HUD.targetInfo })
+HUD.targetAvatar = new("ImageLabel", { Position = UDim2.fromOffset(9, 9), Size = UDim2.fromOffset(54, 54), BackgroundColor3 = WHITE, BackgroundTransparency = 0.9, ImageTransparency = 0, ImageColor3 = WHITE, ScaleType = Enum.ScaleType.Crop, Parent = HUD.targetInfo })
 corner(HUD.targetAvatar, 9)
 HUD.targetName = new("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(74, 10), Size = UDim2.new(1, -86, 0, 20), Text = "Player", Font = Enum.Font.GothamBold, TextSize = 14, TextColor3 = WHITE, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, Parent = HUD.targetInfo })
 HUD.targetLine = new("Frame", { Position = UDim2.fromOffset(74, 38), Size = UDim2.new(1, -88, 0, 5), BackgroundColor3 = WHITE, BackgroundTransparency = 0.86, BorderSizePixel = 0, Parent = HUD.targetInfo })
@@ -1395,9 +1395,14 @@ function HUD.setTargetInfo(plr, show)
     if show and plr and plr.Character then
         if HUD.targetPlayer ~= plr then
             HUD.targetPlayer = plr
+            HUD.targetAvatar.Image = "rbxthumb://type=AvatarHeadShot&id=" .. tostring(plr.UserId) .. "&w=150&h=150"
+            HUD.targetAvatar.ImageTransparency = 0
             task.spawn(function()
-                local ok, img = pcall(function() return Players:GetUserThumbnailAsync(plr.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100) end)
-                if ok and img and HUD.targetPlayer == plr and HUD.targetAvatar.Parent then HUD.targetAvatar.Image = img end
+                local ok, img, ready = pcall(function() return Players:GetUserThumbnailAsync(plr.UserId, Enum.ThumbnailType.AvatarHeadShot, Enum.ThumbnailSize.Size150x150) end)
+                if ok and img and img ~= "" and HUD.targetPlayer == plr and HUD.targetAvatar.Parent then
+                    HUD.targetAvatar.Image = img
+                    HUD.targetAvatar.ImageTransparency = 0
+                end
             end)
         end
         if not HUD.targetShown then
@@ -2709,17 +2714,17 @@ end
 
 -- launcher pill
 WIN.launcher = new("TextButton", {
-    Name = "Launcher", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 46), Size = UDim2.fromOffset(112, 32),
-    BackgroundColor3 = BLACK, BackgroundTransparency = 0.3, Text = "", AutoButtonColor = false, ZIndex = 10, Parent = gui,
+    Name = "Launcher", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 88), Size = UDim2.fromOffset(118, 36),
+    BackgroundColor3 = BLACK, BackgroundTransparency = 0.18, Text = "", AutoButtonColor = false, Active = true, Visible = true, ZIndex = 100, Parent = gui,
 })
-corner(WIN.launcher, 16)
-WIN.launcherStroke = stroke(WIN.launcher, State.accentColor, 0.75)
-WIN.lIc = icon(WIN.launcher, "eye", 14, WHITE)
+corner(WIN.launcher, 18)
+WIN.launcherStroke = stroke(WIN.launcher, State.accentColor, 0.55, 1.4)
+WIN.lIc = icon(WIN.launcher, "eye", 15, WHITE)
 WIN.lIc.Position = UDim2.new(0, 14, 0.5, -7)
-WIN.lIc.ZIndex = 11
+WIN.lIc.ZIndex = 101
 new("TextLabel", {
     BackgroundTransparency = 1, Position = UDim2.fromOffset(34, 0), Size = UDim2.new(1, -40, 1, 0), Text = "Hiruku", Font = Enum.Font.GothamBold,
-    TextSize = 14, TextColor3 = WHITE, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 11, Parent = WIN.launcher,
+    TextSize = 14, TextColor3 = WHITE, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 101, Parent = WIN.launcher,
 })
 
 -- dragging (window via top bar, launcher via itself)
@@ -2749,6 +2754,9 @@ function WIN.draggable(handle, target, onClick)
 end
 WIN.draggable(WIN.topbar, WIN.win)
 WIN.draggable(WIN.launcher, WIN.launcher, function() WIN.setOpen(not WIN.menuOpen) end)
+WIN.launcher:GetPropertyChangedSignal("Visible"):Connect(function()
+    if not WIN.launcher.Visible then WIN.launcher.Visible = true end
+end)
 bind(UIS.InputBegan, function(i, gp)
     if not gp and i.KeyCode == Enum.KeyCode.RightShift then WIN.setOpen(not WIN.menuOpen) end
 end)
