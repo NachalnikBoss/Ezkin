@@ -102,7 +102,7 @@ local Defaults = {
     cross = false, crossStyle = "Ring", crossSize = 56, crossGap = 6, crossColor = WHITE,
     cursor = false, cursorSize = 14, cursorColor = WHITE,
     graph = false,
-    watermark = true, wmName = true, wmUser = true, wmFps = true, wmPing = true, wmTime = true,
+    watermark = true, wmName = true, wmUser = true, wmFps = true, wmPing = true, wmTime = true, playerInfo = true,
     vignette = false, vigStrength = 0.6,
     bars = false, barsSize = 0.09,
     fovOn = false, fovVal = 80,
@@ -118,7 +118,8 @@ local Defaults = {
     glow = false, glowFill = 0.75, glowColor = WHITE,
     toolGlow = false,
     targetEsp = false, targetMode = "Fire Spirits", targetColor = C.ice, targetName = true, targetDistance = true, targetHealth = true,
-    targetVisual = "Fire Spirits", targetCount = 5, targetRadius = 2.8, targetSpeed = 1.6, targetHeight = 2.6, targetSize = 0.65, targetPulse = true, targetRainbow = true, targetOnlyVisible = true,
+    targetVisual = "Ghost Orbit", targetCount = 6, targetRadius = 2.8, targetSpeed = 1.35, targetHeight = 2.6, targetSize = 0.65, targetPulse = true, targetRainbow = true, targetOnlyVisible = true,
+
     chams = false, chamsMode = "Outline", chamsColor = C.rose, chamsPulse = false, chamsTransparency = 0.45,
     jumpCircle = false, jumpCircleSize = 3.2, jumpCircleThickness = 0.12, jumpCircleColor = C.ice, jumpCircleRainbow = true, jumpCirclePulse = true, jumpFade = 2.6, jumpRise = 0.25,
     -- model
@@ -149,6 +150,7 @@ local Defaults = {
     animId = "", animSpeed = 1, animLoop = true,
     -- settings
     menuTransp = 0.1, menuBlur = true, blurAmt = 14, dim = true, configName = "default", autoload = false,
+    hudEdit = false, hudMusicX = 0.5, hudMusicY = 0.78, hudTargetX = 0.78, hudTargetY = 0.28,
 }
 local State = {}
 for k, v in pairs(Defaults) do State[k] = v end
@@ -175,7 +177,7 @@ local fxFolder = new("Folder", { Name = "HirukuFX", Parent = workspace })
 local Glyphs = {
     eye = "◉", ["moon-star"] = "☾", feather = "✦", music = "♪", settings = "⚙", search = "⌕", save = "▣",
     user = "●", ["chevron-down"] = "▾", play = "▶", pause = "❚❚", square = "■", ["rotate-cw"] = "↻",
-    code = "</>", activity = "≈", wifi = "⌁", clock = "◷", power = "⏻", download = "↓", upload = "↑",
+    code = "</>", activity = "≈", wifi = "", clock = "", power = "⏻", download = "↓", upload = "↑",
     target = "◎", shield = "◇", zap = "ϟ", circle = "○", layers = "▤", sparkles = "✧", scan = "⌗", grid = "▦",
 }
 local iconTargets = setmetatable({}, { __mode = "k" })
@@ -590,12 +592,12 @@ local function wingSpec(style, s)
     end
     if style == "Angel" then
         local rows = {
-            { n = 8, len = 3.15, w = 0.48, tr = 0.04 }, { n = 8, len = 2.35, w = 0.43, tr = 0.14 },
-            { n = 7, len = 1.55, w = 0.38, tr = 0.24 }, { n = 5, len = 0.95, w = 0.32, tr = 0.34 },
+            { n = 7, len = 3.0, w = 0.34, tr = 0.03 }, { n = 7, len = 2.35, w = 0.31, tr = 0.12 },
+            { n = 6, len = 1.72, w = 0.28, tr = 0.2 }, { n = 5, len = 1.1, w = 0.24, tr = 0.3 },
         }
         for r, row in ipairs(rows) do
             for i = 1, row.n do
-                add(row.len * (1 - math.abs(i - 2) * 0.05), row.w, 0.05, 6 + (i - 1) * 17 + (r - 1) * 8, (r - 1) * 0.035,
+                add(row.len * (1 - math.abs(i - (row.n + 1) / 2) * 0.035), row.w, 0.045, 8 + (i - 1) * 16 + (r - 1) * 7, (r - 1) * 0.04,
                     "Sphere", (r - 1) / 3 + (i - 1) / (row.n * 3), row.tr, i + r * 2)
             end
         end
@@ -673,11 +675,13 @@ end
 -- accessories ------------------------------------------------
 local function buildAccessories(subj)
     if State.hat and subj.head then
-        local th = 0.16 * State.hatSize
-        for i = 1, 10 do
-            local d = (1 - (i - 1) / 9 * 0.9) * 2.6 * State.hatSize
-            local p = mkPart(subj, Vector3.new(th, d, d), Enum.Material.Neon, Enum.PartType.Cylinder)
-            table.insert(subj.hat, { part = p, i = i, y = 0.55 + (i - 1) * th * 0.85 })
+        local layers = 12
+        for i = 1, layers do
+            local k = (i - 1) / (layers - 1)
+            local radius = (2.55 - k * 2.15) * State.hatSize
+            local thickness = 0.08 * State.hatSize
+            local p = mkPart(subj, Vector3.new(thickness, radius, radius), Enum.Material.Neon, Enum.PartType.Cylinder)
+            table.insert(subj.hat, { part = p, i = i, y = 0.46 + k * 0.34 * State.hatSize, radius = radius })
         end
     end
     if State.halo and subj.head then
@@ -704,7 +708,7 @@ local function stepFX(subj, t, air)
         local hcf, spin = head.CFrame, t * State.hatSpin
         for _, it in ipairs(subj.hat) do
             it.part.CFrame = hcf * CFrame.new(0, it.y, 0) * CFrame.Angles(0, spin, math.pi / 2)
-            it.part.Color = State.hatRainbow and hue(t, it.i * 0.04, 0.25) or State.hatColor:Lerp(WHITE, (it.i - 1) / 9 * 0.6)
+            it.part.Color = State.hatRainbow and hue(t, it.i * 0.04, 0.25) or State.hatColor:Lerp(WHITE, (it.i - 1) / math.max(#subj.hat - 1, 1) * 0.5)
         end
     end
     if subj.halo[1] and head then
@@ -895,28 +899,28 @@ local function rebuildTargetFX()
     if not State.targetEsp then return end
     local mode = State.targetVisual
     local count = math.clamp(State.targetCount, 3, 10)
-    if mode == "Fire Spirits" then
-        for i = 1, count do targetPart(Vector3.new(State.targetSize, State.targetSize * 1.35, State.targetSize), Enum.PartType.Ball) end
-    elseif mode == "Crystals" then
-        for i = 1, count do targetPart(Vector3.new(State.targetSize * 0.55, State.targetSize * 2.4, State.targetSize * 0.55)) end
-    elseif mode == "Rising Ring" then
-        for i = 1, math.max(12, count * 4) do targetPart(Vector3.new(0.12, 0.12, 0.7)) end
-    elseif mode == "Orbit Halo" then
-        for i = 1, count do targetPart(Vector3.new(State.targetSize * 0.9, State.targetSize * 0.9, State.targetSize * 0.9), Enum.PartType.Ball) end
+    if mode == "Ghost Orbit" then
+        for i = 1, count do targetPart(Vector3.new(State.targetSize, State.targetSize * 1.5, State.targetSize), Enum.PartType.Ball) end
+    elseif mode == "Crystal Orbit" then
+        for i = 1, count do targetPart(Vector3.new(State.targetSize * 0.55, State.targetSize * 2.5, State.targetSize * 0.55)) end
+    elseif mode == "Target Circle" then
+        for i = 1, 48 do targetPart(Vector3.new(0.08, 0.06, 0.52)) end
+    elseif mode == "Spiral" then
+        for i = 1, math.max(18, count * 4) do targetPart(Vector3.new(0.11, 0.72, 0.11)) end
     else
-        for i = 1, math.max(10, count * 2) do targetPart(Vector3.new(0.12, 0.8, 0.12)) end
+        for i = 1, 8 do targetPart(Vector3.new(0.12, 0.12, 0.9)) end
     end
     local bb = new("BillboardGui", {
-        Name = "HirukuTargetMarker", Size = UDim2.fromOffset(110, 24), StudsOffset = Vector3.new(0, 4.6, 0),
+        Name = "HirukuTargetMarker", Size = UDim2.fromOffset(150, 26), StudsOffset = Vector3.new(0, 4.4, 0),
         AlwaysOnTop = false, MaxDistance = 250, Parent = visualFolder,
     })
     targetFX.label = new("TextLabel", {
         Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "TARGET", TextColor3 = State.targetColor,
-        TextStrokeTransparency = 0.45, Font = Enum.Font.GothamBold, TextSize = 12, Parent = bb,
+        TextStrokeTransparency = 0.5, Font = Enum.Font.GothamBold, TextSize = 12, Parent = bb,
     })
     targetFX.label.Visible = false
     targetFX.billboard = bb
-    targetFX.lastBuild = mode .. "|" .. tostring(count)
+    targetFX.lastBuild = mode .. "|" .. tostring(count) .. "|" .. tostring(State.targetSize)
 end
 
 local function visibleTarget(plr, root)
@@ -926,7 +930,7 @@ local function visibleTarget(plr, root)
     if dir.Magnitude < 1 then return false end
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
-    params.FilterDescendantsInstances = { LP.Character }
+    params.FilterDescendantsInstances = { LP.Character, visualFolder, fxFolder }
     local hit = workspace:Raycast(c.CFrame.Position, dir, params)
     return not hit or hit.Instance:IsDescendantOf(plr.Character)
 end
@@ -939,14 +943,15 @@ local function getCrosshairTarget()
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= LP and plr.Character then
             local root = plr.Character:FindFirstChild("HumanoidRootPart")
+            local head = plr.Character:FindFirstChild("Head")
             local hum = plr.Character:FindFirstChildOfClass("Humanoid")
-            if root and hum and hum.Health > 0 then
-                local pos, onScreen = c:WorldToViewportPoint(root.Position)
+            if root and head and hum and hum.Health > 0 then
+                local pos, onScreen = c:WorldToViewportPoint(head.Position)
                 if onScreen and pos.Z > 0 then
                     local d = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-                    local maxD = math.max(55, math.min(vp.X, vp.Y) * 0.16)
-                    if d <= maxD and visibleTarget(plr, root) then
-                        local score = d + pos.Z * 0.002
+                    local maxD = math.max(65, math.min(vp.X, vp.Y) * 0.18)
+                    if d <= maxD and visibleTarget(plr, head) then
+                        local score = d + pos.Z * 0.0015
                         if not bestScore or score < bestScore then best, bestScore = plr, score end
                     end
                 end
@@ -978,54 +983,55 @@ local function updateTargetFX(t)
     end
     local mode = State.targetVisual
     local n = #targetFX.parts
-    if mode == "Fire Spirits" then
+    if mode == "Ghost Orbit" then
         for i, p in ipairs(targetFX.parts) do
             local a = t * State.targetSpeed + i / n * math.pi * 2
-            local rr = State.targetRadius * (1 + math.sin(t * 1.8 + i) * 0.08)
-            local y = 1.2 + math.sin(t * 2.2 + i * 1.7) * 0.8
-            p.Position = root.Position + Vector3.new(math.cos(a) * rr, y, math.sin(a) * rr)
-            p.Size = Vector3.new(State.targetSize, State.targetSize * (1.2 + math.sin(t * 4 + i) * 0.2), State.targetSize)
+            local rr = State.targetRadius * (1 + math.sin(t * 1.5 + i) * 0.05)
+            local y = 1.35 + math.sin(t * 1.7 + i * 1.4) * State.targetHeight * 0.42 + (i % 2) * 0.45
+            local pos = root.Position + Vector3.new(math.cos(a) * rr, y, math.sin(a) * rr)
+            p.CFrame = CFrame.new(pos) * CFrame.Angles(0, a + math.pi / 2, math.sin(t * 2 + i) * 0.35)
+            p.Size = Vector3.new(State.targetSize * 0.85, State.targetSize * (1.35 + math.sin(t * 3 + i) * 0.18), State.targetSize * 0.85)
             p.Color = colorAt(i, n)
             p.Transparency = State.targetPulse and 0.12 + (math.sin(t * 4 + i) * 0.5 + 0.5) * 0.22 or 0.12
         end
-    elseif mode == "Crystals" then
+    elseif mode == "Crystal Orbit" then
         for i, p in ipairs(targetFX.parts) do
-            local a = t * State.targetSpeed * 0.75 + i / n * math.pi * 2
-            local rr = State.targetRadius * 0.82
-            local y = 1.3 + math.sin(t * 1.7 + i) * State.targetHeight * 0.38
+            local a = -t * State.targetSpeed * 0.75 + i / n * math.pi * 2
+            local rr = State.targetRadius * 0.86
+            local y = 1.15 + math.sin(t * 1.3 + i) * State.targetHeight * 0.35 + (i % 3) * 0.35
             p.CFrame = CFrame.new(root.Position + Vector3.new(math.cos(a) * rr, y, math.sin(a) * rr))
-                * CFrame.Angles(t * 1.4 + i, a + math.pi * 0.5, math.sin(t + i) * 0.5)
+                * CFrame.Angles(t * 1.6 + i, a + math.pi * 0.5, math.sin(t + i) * 0.4)
             p.Color = colorAt(i, n)
-            p.Transparency = State.targetPulse and 0.18 + (math.sin(t * 3 + i) * 0.5 + 0.5) * 0.2 or 0.18
+            p.Transparency = State.targetPulse and 0.12 + (math.sin(t * 3 + i) * 0.5 + 0.5) * 0.2 or 0.12
         end
-    elseif mode == "Rising Ring" then
+    elseif mode == "Target Circle" then
         for i, p in ipairs(targetFX.parts) do
-            local a = t * State.targetSpeed * 0.6 + i / n * math.pi * 2
-            local rr = State.targetRadius
-            local y = 0.5 + (i % 3) * 0.65 + math.sin(t * 2 + i * 0.55) * State.targetHeight * 0.55
-            p.CFrame = CFrame.new(root.Position + Vector3.new(math.cos(a) * rr, y, math.sin(a) * rr))
-                * CFrame.Angles(0, -a, 0)
+            local a = i / n * math.pi * 2 + t * State.targetSpeed * 0.18
+            local rr = State.targetRadius * (1 + math.sin(t * 2) * 0.03)
+            local y = 0.06 + math.sin(t * 1.8) * 0.05
+            p.CFrame = CFrame.new(root.Position + Vector3.new(math.cos(a) * rr, y, math.sin(a) * rr)) * CFrame.Angles(0, -a, 0)
             p.Color = colorAt(i, n)
-            p.Transparency = 0.1 + (math.sin(t * 2.5 + i) * 0.5 + 0.5) * 0.2
+            p.Transparency = 0.05 + (State.targetPulse and (math.sin(t * 3) * 0.5 + 0.5) * 0.18 or 0)
         end
-    elseif mode == "Orbit Halo" then
+    elseif mode == "Spiral" then
         for i, p in ipairs(targetFX.parts) do
-            local a = t * State.targetSpeed * 0.8 + i / n * math.pi * 2
-            local rr = State.targetRadius * 0.9
-            local y = 2.2 + math.sin(a * 2) * State.targetHeight * 0.65
-            p.Position = root.Position + Vector3.new(math.cos(a) * rr, y, math.sin(a) * rr)
+            local a = t * State.targetSpeed * 0.8 + i / n * math.pi * 4
+            local rr = State.targetRadius * (0.25 + (i / n) * 0.85)
+            local y = 0.4 + (i / n) * State.targetHeight + math.sin(t * 2 + i) * 0.15
+            p.CFrame = CFrame.new(root.Position + Vector3.new(math.cos(a) * rr, y, math.sin(a) * rr)) * CFrame.Angles(a, -a, 0)
             p.Color = colorAt(i, n)
-            p.Transparency = 0.1
+            p.Transparency = 0.08 + (math.sin(t * 3 + i) * 0.5 + 0.5) * 0.16
         end
     else
         for i, p in ipairs(targetFX.parts) do
-            local a = t * State.targetSpeed + i / n * math.pi * 2
-            local rr = State.targetRadius * (0.65 + (math.sin(t * 2 + i) * 0.5 + 0.5) * 0.5)
-            local y = 0.2 + (i % 5) * 0.65
-            p.CFrame = CFrame.new(root.Position + Vector3.new(math.cos(a) * rr, y, math.sin(a) * rr))
-                * CFrame.Angles(a, 0, math.pi * 0.25)
+            local side = i <= 4 and -1 or 1
+            local idx = ((i - 1) % 4) + 1
+            local a = t * State.targetSpeed * 0.5 + idx * 0.35
+            local y = 0.5 + (idx - 1) * 0.9
+            local x = side * (State.targetRadius * 0.72)
+            p.CFrame = CFrame.new(root.Position + Vector3.new(x, y, math.sin(a) * 0.55)) * CFrame.Angles(0, side * 0.25, 0)
             p.Color = colorAt(i, n)
-            p.Transparency = 0.08 + (math.sin(t * 4 + i) * 0.5 + 0.5) * 0.18
+            p.Transparency = 0.05 + (State.targetPulse and (math.sin(t * 4 + i) * 0.5 + 0.5) * 0.15 or 0)
         end
     end
     if targetFX.label then
@@ -1234,6 +1240,29 @@ new("UIListLayout", {
     FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Right,
     Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder, Parent = HUD.wmHolder,
 })
+local function watermarkIcon(parent, name, color)
+    local holder = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(16, 16), Parent = parent })
+    if name == "wifi" then
+        for i, w in ipairs({ 14, 10, 6 }) do
+            local arc = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(w, w), Position = UDim2.fromOffset((16 - w) / 2, 0), Parent = holder })
+            corner(arc, 999)
+            stroke(arc, color, 0.05, 1.5)
+            new("Frame", { BackgroundColor3 = Color3.fromRGB(10, 10, 12), BorderSizePixel = 0, Size = UDim2.fromOffset(w + 2, w / 2 + 2), Position = UDim2.fromOffset((16 - w) / 2 - 1, -1), Parent = arc })
+        end
+        new("Frame", { BackgroundColor3 = color, BorderSizePixel = 0, Size = UDim2.fromOffset(3, 3), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.82), Parent = holder })
+    elseif name == "clock" then
+        local face = new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromOffset(13, 13), Position = UDim2.fromOffset(1.5, 1.5), Parent = holder })
+        corner(face, 999)
+        stroke(face, color, 0.05, 1.4)
+        new("Frame", { BackgroundColor3 = color, BorderSizePixel = 0, Size = UDim2.fromOffset(1.4, 4.4), AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.fromScale(0.5, 0.52), Parent = face })
+        new("Frame", { BackgroundColor3 = color, BorderSizePixel = 0, Size = UDim2.fromOffset(4, 1.4), AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.fromScale(0.5, 0.55), Parent = face })
+    else
+        local ic = icon(holder, name, 16, color)
+        ic.Position = UDim2.fromScale(0, 0)
+    end
+    return holder
+end
+
 function HUD.pill(order, iconName, text)
     local f = new("Frame", {
         Size = UDim2.fromOffset(0, 26), AutomaticSize = Enum.AutomaticSize.X, BackgroundColor3 = Color3.fromRGB(10, 10, 12),
@@ -1246,7 +1275,7 @@ function HUD.pill(order, iconName, text)
         FillDirection = Enum.FillDirection.Horizontal, VerticalAlignment = Enum.VerticalAlignment.Center,
         Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder, Parent = f,
     })
-    local ic = icon(f, iconName, 13, WHITE)
+    local ic = watermarkIcon(f, iconName, WHITE)
     ic.LayoutOrder = 1
     local lbl = new("TextLabel", {
         Size = UDim2.fromOffset(0, 26), AutomaticSize = Enum.AutomaticSize.X, BackgroundTransparency = 1,
@@ -1264,7 +1293,7 @@ HUD.wmTimePill, HUD.wmTimeLbl = HUD.pill(5, "clock", "00:00")
 HUD.snd = new("Sound", { Name = "HirukuMusic", Volume = State.musicVol, Looped = State.musicLoop, Parent = SoundService })
 HUD.musicTitle = "Nothing playing"
 HUD.musicPanel = new("Frame", {
-    Position = UDim2.fromOffset(12, 56), Size = UDim2.fromOffset(236, 66), BackgroundColor3 = Color3.fromRGB(8, 8, 10),
+    Position = UDim2.fromScale(State.hudMusicX, State.hudMusicY), Size = UDim2.fromOffset(236, 66), BackgroundColor3 = Color3.fromRGB(8, 8, 10),
     BackgroundTransparency = 0.15, Visible = false, Parent = hud,
 })
 corner(HUD.musicPanel, 8)
@@ -1296,6 +1325,76 @@ HUD.musicPlay = new("TextButton", {
 })
 HUD.musicPlayIcon = icon(HUD.musicPlay, "play", 16, WHITE)
 HUD.musicPlayIcon.AnchorPoint, HUD.musicPlayIcon.Position = Vector2.new(0.5, 0.5), UDim2.fromScale(0.5, 0.5)
+
+HUD.targetInfo = new("CanvasGroup", {
+    AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(State.hudTargetX, State.hudTargetY), Size = UDim2.fromOffset(238, 72),
+    BackgroundColor3 = Color3.fromRGB(8, 8, 10), BackgroundTransparency = 0.12, GroupTransparency = 1, Visible = false, Parent = hud,
+})
+corner(HUD.targetInfo, 10)
+stroke(HUD.targetInfo, WHITE, 0.88)
+HUD.targetAvatar = new("ImageLabel", { Position = UDim2.fromOffset(9, 9), Size = UDim2.fromOffset(54, 54), BackgroundColor3 = WHITE, BackgroundTransparency = 0.9, Parent = HUD.targetInfo })
+corner(HUD.targetAvatar, 9)
+HUD.targetName = new("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(74, 10), Size = UDim2.new(1, -86, 0, 20), Text = "Player", Font = Enum.Font.GothamBold, TextSize = 14, TextColor3 = WHITE, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, Parent = HUD.targetInfo })
+HUD.targetLine = new("Frame", { Position = UDim2.fromOffset(74, 38), Size = UDim2.new(1, -88, 0, 5), BackgroundColor3 = WHITE, BackgroundTransparency = 0.86, BorderSizePixel = 0, Parent = HUD.targetInfo })
+corner(HUD.targetLine, 3)
+HUD.targetFill = new("Frame", { Size = UDim2.fromScale(0.5, 1), BackgroundColor3 = C.ice, BorderSizePixel = 0, Parent = HUD.targetLine })
+corner(HUD.targetFill, 3)
+HUD.targetMeta = new("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(74, 49), Size = UDim2.new(1, -86, 0, 14), Text = "20 HP  ·  0 studs", Font = Enum.Font.Gotham, TextSize = 10, TextColor3 = GRAY, TextXAlignment = Enum.TextXAlignment.Left, Parent = HUD.targetInfo })
+HUD.targetShown = false
+HUD.targetPlayer = nil
+HUD.targetTween = nil
+HUD.targetThumb = ""
+
+function HUD.setTargetInfo(plr, show)
+    if show and plr and plr.Character then
+        if HUD.targetPlayer ~= plr then
+            HUD.targetPlayer = plr
+            task.spawn(function()
+                local ok, img = pcall(function() return Players:GetUserThumbnailAsync(plr.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100) end)
+                if ok and img and HUD.targetPlayer == plr and HUD.targetAvatar.Parent then HUD.targetAvatar.Image = img end
+            end)
+        end
+        if not HUD.targetShown then
+            HUD.targetShown = true
+            HUD.targetInfo.Visible = true
+            HUD.targetInfo.Position = UDim2.fromScale(State.hudTargetX, State.hudTargetY + 0.025)
+            tween(HUD.targetInfo, 0.2, { GroupTransparency = 0, Position = UDim2.fromScale(State.hudTargetX, State.hudTargetY) }, Enum.EasingStyle.Quart)
+        end
+    elseif HUD.targetShown then
+        HUD.targetShown = false
+        tween(HUD.targetInfo, 0.18, { GroupTransparency = 1, Position = UDim2.fromScale(State.hudTargetX, State.hudTargetY + 0.02) }, Enum.EasingStyle.Quad)
+        task.delay(0.2, function() if not HUD.targetShown and HUD.targetInfo.Parent then HUD.targetInfo.Visible = false end end)
+    end
+end
+
+function HUD.makeDraggable(panel, keyX, keyY)
+    local dragging = false
+    local start, baseX, baseY
+    bind(panel.InputBegan, function(input)
+        if not State.hudEdit then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            start = input.Position
+            baseX, baseY = State[keyX], State[keyY]
+        end
+    end)
+    bind(UIS.InputChanged, function(input)
+        if not dragging or not State.hudEdit then return end
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            local v = cam().ViewportSize
+            local dx = (input.Position.X - start.X) / math.max(v.X, 1)
+            local dy = (input.Position.Y - start.Y) / math.max(v.Y, 1)
+            State[keyX], State[keyY] = math.clamp(baseX + dx, 0.08, 0.92), math.clamp(baseY + dy, 0.08, 0.92)
+            panel.Position = UDim2.fromScale(State[keyX], State[keyY])
+        end
+    end)
+    bind(UIS.InputEnded, function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
+    end)
+end
+
+HUD.makeDraggable(HUD.musicPanel, "hudMusicX", "hudMusicY")
+HUD.makeDraggable(HUD.targetInfo, "hudTargetX", "hudTargetY")
 
 function HUD.mmss(s) s = math.max(0, math.floor(s)) return string.format("%d:%02d", s // 60, s % 60) end
 function HUD.playMusic(id)
@@ -1384,8 +1483,31 @@ function HUD.stepHUD(dt, t)
         HUD.wmNamePill.Visible, HUD.wmUserPill.Visible, HUD.wmFpsPill.Visible = State.wmName, State.wmUser, State.wmFps
         HUD.wmPingPill.Visible, HUD.wmTimePill.Visible = State.wmPing, State.wmTime
     end
-    -- music widget
-    HUD.musicPanel.Visible = State.music
+    HUD.musicPanel.Visible = State.music or State.hudEdit
+    HUD.musicPanel.Position = UDim2.fromScale(State.hudMusicX, State.hudMusicY)
+    HUD.musicPanel.AnchorPoint = Vector2.new(0.5, 0.5)
+    HUD.musicPanel.BackgroundTransparency = State.hudEdit and 0.04 or 0.15
+    local target = getCrosshairTarget()
+    if State.hudEdit then
+        HUD.setTargetInfo(target or LP, true)
+        HUD.targetInfo.BackgroundTransparency = 0.04
+        HUD.targetInfo.Position = UDim2.fromScale(State.hudTargetX, State.hudTargetY)
+    else
+        HUD.targetInfo.BackgroundTransparency = 0.12
+        HUD.setTargetInfo(target, State.playerInfo and target ~= nil)
+    end
+    if target and target.Character then
+        local hum = target.Character:FindFirstChildOfClass("Humanoid")
+        local root = target.Character:FindFirstChild("HumanoidRootPart")
+        if hum and root then
+            local hp = math.max(0, hum.Health)
+            local maxHp = math.max(1, hum.MaxHealth)
+            HUD.targetName.Text = target.DisplayName
+            HUD.targetMeta.Text = string.format("%.0f / %.0f HP  ·  %.0f studs", hp, maxHp, (root.Position - (Real.root and Real.root.Position or cam().CFrame.Position)).Magnitude)
+            HUD.targetFill.Size = UDim2.fromScale(math.clamp(hp / maxHp, 0, 1), 1)
+            HUD.targetFill.BackgroundColor3 = Color3.fromRGB(255 - math.floor(155 * math.clamp(hp / maxHp, 0, 1)), 80 + math.floor(150 * math.clamp(hp / maxHp, 0, 1)), 90)
+        end
+    end
     if State.music then
         HUD.musicLbl.Text = HUD.musicTitle
         local len = HUD.snd.TimeLength
@@ -1634,6 +1756,38 @@ else
     WIN.contentPos = WIN.content.Position
 end
 
+WIN.searchOpen = false
+WIN.searchBasePosition = UDim2.new(1, -8, WIN.searchPill.Position.Y.Scale, WIN.searchPill.Position.Y.Offset)
+WIN.searchBaseSize = WIN.searchPill.Size
+WIN.searchPill.AnchorPoint = Vector2.new(1, 0)
+WIN.searchPill.ClipsDescendants = true
+WIN.searchPill.Position = WIN.searchBasePosition
+WIN.searchPill.Size = UDim2.fromOffset(34, WIN.searchBaseSize.Y.Offset)
+WIN.search.TextTransparency = 1
+WIN.searchIc.AnchorPoint = Vector2.new(0.5, 0.5)
+WIN.searchIc.Position = UDim2.fromScale(0.5, 0.5)
+WIN.searchHit = new("TextButton", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Text = "", AutoButtonColor = false, Parent = WIN.searchPill })
+local searchZ = WIN.searchPill.ZIndex
+WIN.searchHit.ZIndex = searchZ + 2
+WIN.searchIc.ZIndex = searchZ + 3
+WIN.search.ZIndex = searchZ + 4
+function WIN.setSearch(open)
+    WIN.searchOpen = open
+    local targetPos = open and WIN.searchBasePosition or UDim2.new(1, -8, WIN.searchBasePosition.Y.Scale, WIN.searchBasePosition.Y.Offset)
+    local targetSize = open and WIN.searchBaseSize or UDim2.fromOffset(34, WIN.searchBaseSize.Y.Offset)
+    tween(WIN.searchPill, 0.24, { Position = targetPos, Size = targetSize }, Enum.EasingStyle.Quart)
+    tween(WIN.searchIc, 0.2, { Position = open and UDim2.new(0, 12, 0.5, -7) or UDim2.fromScale(0.5, 0.5) }, Enum.EasingStyle.Quad)
+    tween(WIN.search, 0.18, { TextTransparency = open and 0 or 1 }, Enum.EasingStyle.Quad)
+    if open then
+        task.delay(0.2, function() if WIN.searchOpen and WIN.search.Parent then WIN.search:CaptureFocus() end end)
+    end
+end
+WIN.searchHit.MouseButton1Click:Connect(function() WIN.setSearch(not WIN.searchOpen) end)
+WIN.searchIc.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then WIN.setSearch(not WIN.searchOpen) end end)
+WIN.search.FocusLost:Connect(function()
+    if WIN.search.Text == "" then WIN.setSearch(false) end
+end)
+
 ---------------------------------------------------------------- row builders
 bind(UIS.InputChanged, function(i)
     if WIN.activeSlider and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
@@ -1698,8 +1852,14 @@ Builders.toggle = function(f, parent, order, compact)
         local gi = icon(gear, "settings", 16, GRAY)
         gi.AnchorPoint, gi.Position = Vector2.new(0.5, 0.5), UDim2.fromScale(0.5, 0.5)
         gear.MouseButton1Click:Connect(function()
-            o.Visible = not o.Visible
-            tintIcon(gi, o.Visible and WHITE or GRAY)
+            local opening = not o.Visible
+            o.Visible = opening
+            tween(gi, 0.28, { Rotation = opening and -24 or 0 }, Enum.EasingStyle.Quad)
+            tintIcon(gi, opening and WHITE or GRAY)
+            if opening then
+                o.Position = UDim2.fromOffset(10, 5)
+                tween(o, 0.22, { Position = UDim2.fromOffset(0, 0) }, Enum.EasingStyle.Quad)
+            end
         end)
     end
     head.MouseButton1Click:Connect(function()
@@ -2036,6 +2196,16 @@ local MusicTracks = {
     ["Turtle"] = { id = "9245559862", title = "Parry Gripp - Turtle" },
     ["Bossa Me"] = { id = "1837768921", title = "Bossa Me (30)" },
     ["Congratulations"] = { id = "628700458", title = "Congratulations, You Won!" },
+    ["Morning Mood"] = { id = "1846088038", title = "Morning Mood" },
+    ["Four Seasons - Spring"] = { id = "9045766074", title = "The Four Seasons - Spring" },
+    ["Classic Easter"] = { id = "1836009208", title = "Classic Easter" },
+    ["Science Mysteries"] = { id = "1840776993", title = "Science Mysteries" },
+    ["Paradise Falls"] = { id = "1837879082", title = "Paradise Falls" },
+    ["Life in an Elevator"] = { id = "1841647093", title = "Life in an Elevator" },
+    ["Chill Jazz"] = { id = "1845341094", title = "Chill Jazz" },
+    ["Cool Vibes"] = { id = "1840684529", title = "Cool Vibes" },
+    ["Gymnopedie No. 1"] = { id = "9045766377", title = "Gymnopedie No. 1" },
+    ["Night Run"] = { id = "9044545570", title = "Night Run" },
 }
 
 HUD.selectTrack = function(name)
@@ -2102,7 +2272,7 @@ WIN.Pages = {
         } },
         { name = "Players", features = {
             T("Target ESP", "targetEsp", function() rebuildTargetFX() refreshPlayerVisuals() end, {
-                DD("Visual", "targetVisual", { "Fire Spirits", "Crystals", "Rising Ring", "Orbit Halo", "Pulse Cage" }, rebuildTargetFX),
+                DD("Visual", "targetVisual", { "Ghost Orbit", "Crystal Orbit", "Target Circle", "Spiral", "Brackets" }, rebuildTargetFX),
                 S("Count", "targetCount", 3, 10, 1, rebuildTargetFX),
                 S("Radius", "targetRadius", 1.5, 5, 0.1),
                 S("Speed", "targetSpeed", 0.3, 4, 0.1),
@@ -2116,6 +2286,7 @@ WIN.Pages = {
                 T("Health", "targetHealth"),
                 CL("Color", "targetColor"),
             }),
+            T("Player Info", "playerInfo"),
             T("Chams", "chams", refreshPlayerVisuals, {
                 DD("Style", "chamsMode", { "Outline", "Fill", "Pulse", "Glass" }, refreshPlayerVisuals),
                 CL("Color", "chamsColor", refreshPlayerVisuals),
@@ -2248,7 +2419,7 @@ WIN.Pages = {
     { name = "Misc", icon = "music", groups = {
         { name = "Music", features = {
             T("Player Widget", "music"),
-            DD("Playlist", "musicTrack", { "Custom", "Raining Tacos", "Turtle", "Bossa Me", "Congratulations" }, function(v) HUD.selectTrack(v) end),
+            DD("Playlist", "musicTrack", { "Custom", "Raining Tacos", "Turtle", "Bossa Me", "Congratulations", "Morning Mood", "Four Seasons - Spring", "Classic Easter", "Science Mysteries", "Paradise Falls", "Life in an Elevator", "Chill Jazz", "Cool Vibes", "Gymnopedie No. 1", "Night Run" }, function(v) HUD.selectTrack(v) end),
             IN("Sound ID", "musicId", "rbxassetid number"),
             BT("Play Selected", "play", function() HUD.playSelectedMusic() end),
             BT("Pause / Resume", "pause", HUD.toggleMusic),
@@ -2266,6 +2437,26 @@ WIN.Pages = {
             T("Background Blur", "menuBlur", nil, { S("Amount", "blurAmt", 2, 30, 1) }),
             T("Dim Background", "dim"),
             LB("Menu key: RightShift (or tap the Hiruku pill). Drag the top bar to move the window."),
+        } },
+        { name = "HUD Editor", features = {
+            T("Edit HUD", "hudEdit", function(v)
+                if v then
+                    HUD.musicPanel.Visible = State.music or true
+                    HUD.targetInfo.Visible = true
+                    HUD.targetInfo.GroupTransparency = 0
+                else
+                    HUD.targetInfo.Visible = false
+                    HUD.targetInfo.GroupTransparency = 1
+                end
+            end),
+            BT("Reset HUD Positions", "rotate-cw", function()
+                State.hudMusicX, State.hudMusicY = 0.5, 0.78
+                State.hudTargetX, State.hudTargetY = 0.78, 0.28
+                HUD.musicPanel.Position = UDim2.fromScale(State.hudMusicX, State.hudMusicY)
+                HUD.targetInfo.Position = UDim2.fromScale(State.hudTargetX, State.hudTargetY)
+                render(true)
+            end),
+            LB("When Edit HUD is enabled, drag the Music and Player Info panels directly on the screen."),
         } },
         { name = "Config", features = {
             IN("Config Name", "configName", "default", function(t) WIN.cfgBox.Text = t end),
@@ -2765,6 +2956,7 @@ unload = function()
     for _, e in pairs(FX) do pcall(function() e:Destroy() end) end
     WIN.menuBlurFX:Destroy()
     HUD.snd:Destroy()
+    pcall(function() HUD.targetInfo:Destroy() end)
     restoreWorld()
     if State.fovOn then cam().FieldOfView = origFov end
     if HUD.cursorHidden then UIS.MouseIconEnabled = true end
