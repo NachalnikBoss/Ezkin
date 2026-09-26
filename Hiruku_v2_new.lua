@@ -103,12 +103,13 @@ local Defaults = {
     cursor = false, cursorSize = 14, cursorColor = WHITE,
     graph = false,
     watermark = true, wmName = true, wmUser = true, wmFps = true, wmPing = true, wmTime = true, playerInfo = true,
+    accentColor = C.ice,
     vignette = false, vigStrength = 0.6,
     bars = false, barsSize = 0.09,
     fovOn = false, fovVal = 80,
     notify = true,
     -- effects
-    hat = false, hatSize = 1, hatSpin = 1.5, hatRainbow = false, hatColor = WHITE,
+    hat = false, hatSize = 1, hatHeight = 0.68, hatForward = 0, hatSide = 0, hatSpin = 1.5, hatRainbow = false, hatColor = WHITE,
     halo = false, haloHeight = 0.95, haloRainbow = false, haloColor = C.gold,
     orbs = false, orbCount = 5, orbRadius = 3.2, orbSpeed = 1.2, orbRainbow = false, orbColor = WHITE,
     ring = false, ringSize = 3.4, ringRainbow = false, ringColor = WHITE,
@@ -147,6 +148,8 @@ local Defaults = {
     skyRings = false, skyRingCount = 3, skyRingRadius = 42, skyRingHeight = 18, skyRingSpeed = 0.35, skyRingColor = C.violet, skyRingRainbow = true,
     aurora = false, auroraColor = C.ice, auroraStrength = 0.35,
     music = false, musicId = "", musicVol = 0.6, musicLoop = true, musicTrack = "Custom",
+    antiFling = false, antiFlingMaxSpeed = 85, antiFlingMaxAngular = 70, antiFlingRecovery = true,
+    skinPreset = "Default", skinUserId = "", skinScale = 1,
     animId = "", animSpeed = 1, animLoop = true,
     -- settings
     menuTransp = 0.1, menuBlur = true, blurAmt = 14, dim = true, configName = "default", autoload = false,
@@ -175,10 +178,10 @@ local fxFolder = new("Folder", { Name = "HirukuFX", Parent = workspace })
 
 ---------------------------------------------------------------- icons (Lucide)
 local Glyphs = {
-    eye = "◉", ["moon-star"] = "☾", feather = "✦", music = "♪", settings = "⚙", search = "⌕", save = "▣",
-    user = "●", ["chevron-down"] = "▾", play = "▶", pause = "❚❚", square = "■", ["rotate-cw"] = "↻",
-    code = "</>", activity = "≈", wifi = "", clock = "", power = "⏻", download = "↓", upload = "↑",
-    target = "◎", shield = "◇", zap = "ϟ", circle = "○", layers = "▤", sparkles = "✧", scan = "⌗", grid = "▦",
+    eye = "O", ["moon-star"] = "*", feather = "W", music = "M", settings = "S", search = "Q", save = "D",
+    user = "U", ["chevron-down"] = "v", play = ">", pause = "||", square = "#", ["rotate-cw"] = "R",
+    code = "</>", activity = "~", wifi = "W", clock = "O", power = "P", download = "D", upload = "U",
+    target = "O", shield = "S", zap = "Z", circle = "O", layers = "L", sparkles = "*", scan = "X", grid = "G",
 }
 local iconTargets = setmetatable({}, { __mode = "k" })
 local Lucide
@@ -679,9 +682,9 @@ local function buildAccessories(subj)
         for i = 1, layers do
             local k = (i - 1) / (layers - 1)
             local radius = (2.55 - k * 2.15) * State.hatSize
-            local thickness = 0.08 * State.hatSize
+            local thickness = 0.065 * State.hatSize
             local p = mkPart(subj, Vector3.new(thickness, radius, radius), Enum.Material.Neon, Enum.PartType.Cylinder)
-            table.insert(subj.hat, { part = p, i = i, y = 0.46 + k * 0.34 * State.hatSize, radius = radius })
+            table.insert(subj.hat, { part = p, i = i, y = 0.68 + k * 0.22 * State.hatSize, radius = radius })
         end
     end
     if State.halo and subj.head then
@@ -689,7 +692,8 @@ local function buildAccessories(subj)
     end
     if State.orbs and subj.root then
         for i = 1, State.orbCount do
-            table.insert(subj.orbs, { part = mkPart(subj, Vector3.new(0.5, 0.5, 0.5), Enum.Material.Neon, Enum.PartType.Ball), i = i })
+            local s = 0.42 + State.orbRadius * 0.018
+            table.insert(subj.orbs, { part = mkPart(subj, Vector3.new(s, s, s), Enum.Material.Neon, Enum.PartType.Ball), i = i })
         end
     end
     if State.ring and subj.root then
@@ -707,7 +711,7 @@ local function stepFX(subj, t, air)
     if subj.hat[1] and head then
         local hcf, spin = head.CFrame, t * State.hatSpin
         for _, it in ipairs(subj.hat) do
-            it.part.CFrame = hcf * CFrame.new(0, it.y, 0) * CFrame.Angles(0, spin, math.pi / 2)
+            it.part.CFrame = hcf * CFrame.new(State.hatSide, State.hatHeight + it.y - 0.68, State.hatForward) * CFrame.Angles(0, spin, math.pi / 2)
             it.part.Color = State.hatRainbow and hue(t, it.i * 0.04, 0.25) or State.hatColor:Lerp(WHITE, (it.i - 1) / math.max(#subj.hat - 1, 1) * 0.5)
         end
     end
@@ -724,7 +728,10 @@ local function stepFX(subj, t, air)
         local rp, n = root.Position, #subj.orbs
         for _, it in ipairs(subj.orbs) do
             local a = t * State.orbSpeed + it.i / n * math.pi * 2
-            it.part.Position = rp + Vector3.new(math.cos(a) * State.orbRadius, math.sin(a * 2 + it.i) * 0.9 + 0.3, math.sin(a) * State.orbRadius)
+            local bob = math.sin(t * State.orbSpeed * 1.7 + it.i * 1.2) * 0.55
+            local vertical = 0.75 + bob + math.sin(a * 1.5 + it.i) * 0.12
+            it.part.CFrame = CFrame.new(rp + Vector3.new(math.cos(a) * State.orbRadius, vertical, math.sin(a) * State.orbRadius))
+                * CFrame.Angles(t * 1.2 + it.i, a, math.sin(t + it.i) * 0.2)
             it.part.Color = State.orbRainbow and hue(t, it.i / n) or State.orbColor
         end
     end
@@ -884,10 +891,10 @@ local function clearTargetFX()
     targetFX.lastBuild = ""
 end
 
-local function targetPart(size, shape)
+local function targetPart(size, shape, transparency)
     local p = new("Part", {
         Anchored = true, CanCollide = false, CanTouch = false, CanQuery = false, CastShadow = false,
-        Material = Enum.Material.Neon, Size = size, Transparency = 0.08, Parent = visualFolder,
+        Material = Enum.Material.Neon, Size = size, Transparency = transparency or 0.08, Parent = visualFolder,
     })
     if shape then p.Shape = shape end
     table.insert(targetFX.parts, p)
@@ -900,15 +907,18 @@ local function rebuildTargetFX()
     local mode = State.targetVisual
     local count = math.clamp(State.targetCount, 3, 10)
     if mode == "Ghost Orbit" then
-        for i = 1, count do targetPart(Vector3.new(State.targetSize, State.targetSize * 1.5, State.targetSize), Enum.PartType.Ball) end
+        for i = 1, count do
+            targetPart(Vector3.new(State.targetSize * 0.8, State.targetSize * 1.35, State.targetSize * 0.8), Enum.PartType.Ball, 0.18)
+            targetPart(Vector3.new(State.targetSize * 0.32, State.targetSize * 1.9, State.targetSize * 0.32), Enum.PartType.Ball, 0.28)
+        end
     elseif mode == "Crystal Orbit" then
-        for i = 1, count do targetPart(Vector3.new(State.targetSize * 0.55, State.targetSize * 2.5, State.targetSize * 0.55)) end
+        for i = 1, count do targetPart(Vector3.new(State.targetSize * 0.48, State.targetSize * 2.4, State.targetSize * 0.48), nil, 0.1) end
     elseif mode == "Target Circle" then
-        for i = 1, 48 do targetPart(Vector3.new(0.08, 0.06, 0.52)) end
+        for i = 1, 48 do targetPart(Vector3.new(0.07, 0.045, 0.48), nil, 0.04) end
     elseif mode == "Spiral" then
-        for i = 1, math.max(18, count * 4) do targetPart(Vector3.new(0.11, 0.72, 0.11)) end
+        for i = 1, math.max(18, count * 4) do targetPart(Vector3.new(0.08, 0.5, 0.08), nil, 0.1) end
     else
-        for i = 1, 8 do targetPart(Vector3.new(0.12, 0.12, 0.9)) end
+        for i = 1, 8 do targetPart(Vector3.new(0.1, 0.1, 0.72), nil, 0.04) end
     end
     local bb = new("BillboardGui", {
         Name = "HirukuTargetMarker", Size = UDim2.fromOffset(150, 26), StudsOffset = Vector3.new(0, 4.4, 0),
@@ -978,66 +988,73 @@ local function updateTargetFX(t)
         return
     end
     local colorAt = function(i, n)
-        if State.targetRainbow then return hue(t, i / math.max(n, 1), 0.2) end
+        if State.targetRainbow then return hue(t, i / math.max(n, 1), 0.18) end
         return State.targetColor
     end
     local mode = State.targetVisual
     local n = #targetFX.parts
     if mode == "Ghost Orbit" then
-        for i, p in ipairs(targetFX.parts) do
-            local a = t * State.targetSpeed + i / n * math.pi * 2
-            local rr = State.targetRadius * (1 + math.sin(t * 1.5 + i) * 0.05)
-            local y = 1.35 + math.sin(t * 1.7 + i * 1.4) * State.targetHeight * 0.42 + (i % 2) * 0.45
-            local pos = root.Position + Vector3.new(math.cos(a) * rr, y, math.sin(a) * rr)
-            p.CFrame = CFrame.new(pos) * CFrame.Angles(0, a + math.pi / 2, math.sin(t * 2 + i) * 0.35)
-            p.Size = Vector3.new(State.targetSize * 0.85, State.targetSize * (1.35 + math.sin(t * 3 + i) * 0.18), State.targetSize * 0.85)
-            p.Color = colorAt(i, n)
-            p.Transparency = State.targetPulse and 0.12 + (math.sin(t * 4 + i) * 0.5 + 0.5) * 0.22 or 0.12
+        local pairsCount = math.max(1, math.floor(n / 2))
+        for i = 1, pairsCount do
+            local a = t * State.targetSpeed * 0.8 + i / pairsCount * math.pi * 2
+            local rr = State.targetRadius * (0.82 + math.sin(t * 1.2 + i) * 0.035)
+            local bob = math.sin(t * 1.7 + i * 0.8) * State.targetHeight * 0.16
+            local base = root.Position + Vector3.new(math.cos(a) * rr, 1.45 + bob, math.sin(a) * rr)
+            local p1, p2 = targetFX.parts[(i - 1) * 2 + 1], targetFX.parts[(i - 1) * 2 + 2]
+            p1.CFrame = CFrame.new(base) * CFrame.Angles(0, -a, math.sin(t * 2 + i) * 0.18)
+            p2.CFrame = CFrame.new(base + Vector3.new(0, 0.45 + math.sin(t * 2 + i) * 0.06, 0)) * CFrame.Angles(math.sin(t + i), -a, 0)
+            p1.Color, p2.Color = colorAt(i, pairsCount), colorAt(i + 1, pairsCount)
+            local pulse = State.targetPulse and (0.05 + (math.sin(t * 4 + i) * 0.5 + 0.5) * 0.18) or 0.12
+            p1.Transparency, p2.Transparency = pulse, math.min(0.42, pulse + 0.18)
         end
     elseif mode == "Crystal Orbit" then
         for i, p in ipairs(targetFX.parts) do
-            local a = -t * State.targetSpeed * 0.75 + i / n * math.pi * 2
-            local rr = State.targetRadius * 0.86
-            local y = 1.15 + math.sin(t * 1.3 + i) * State.targetHeight * 0.35 + (i % 3) * 0.35
+            local a = -t * State.targetSpeed * 0.7 + i / n * math.pi * 2
+            local rr = State.targetRadius * 0.78
+            local y = 1.05 + (i % 3) * 0.45 + math.sin(t * 1.4 + i) * State.targetHeight * 0.15
             p.CFrame = CFrame.new(root.Position + Vector3.new(math.cos(a) * rr, y, math.sin(a) * rr))
-                * CFrame.Angles(t * 1.6 + i, a + math.pi * 0.5, math.sin(t + i) * 0.4)
+                * CFrame.Angles(t * 1.3 + i, a + math.pi * 0.5, math.sin(t + i) * 0.28)
+            p.Size = Vector3.new(State.targetSize * 0.42, State.targetSize * (1.8 + math.sin(t * 2 + i) * 0.15), State.targetSize * 0.42)
             p.Color = colorAt(i, n)
-            p.Transparency = State.targetPulse and 0.12 + (math.sin(t * 3 + i) * 0.5 + 0.5) * 0.2 or 0.12
+            p.Transparency = State.targetPulse and 0.08 + (math.sin(t * 3 + i) * 0.5 + 0.5) * 0.16 or 0.12
         end
     elseif mode == "Target Circle" then
         for i, p in ipairs(targetFX.parts) do
-            local a = i / n * math.pi * 2 + t * State.targetSpeed * 0.18
-            local rr = State.targetRadius * (1 + math.sin(t * 2) * 0.03)
-            local y = 0.06 + math.sin(t * 1.8) * 0.05
-            p.CFrame = CFrame.new(root.Position + Vector3.new(math.cos(a) * rr, y, math.sin(a) * rr)) * CFrame.Angles(0, -a, 0)
+            local a = i / n * math.pi * 2 + t * State.targetSpeed * 0.12
+            local rr = State.targetRadius * (1 + math.sin(t * 2) * 0.025)
+            local y = 0.04 + math.sin(t * 1.8) * 0.035
+            p.CFrame = CFrame.new(root.Position + Vector3.new(math.cos(a) * rr, y, math.sin(a) * rr))
+                * CFrame.Angles(0, -a, 0)
             p.Color = colorAt(i, n)
-            p.Transparency = 0.05 + (State.targetPulse and (math.sin(t * 3) * 0.5 + 0.5) * 0.18 or 0)
+            p.Transparency = 0.04 + (State.targetPulse and (math.sin(t * 3) * 0.5 + 0.5) * 0.12 or 0)
         end
     elseif mode == "Spiral" then
         for i, p in ipairs(targetFX.parts) do
-            local a = t * State.targetSpeed * 0.8 + i / n * math.pi * 4
-            local rr = State.targetRadius * (0.25 + (i / n) * 0.85)
-            local y = 0.4 + (i / n) * State.targetHeight + math.sin(t * 2 + i) * 0.15
-            p.CFrame = CFrame.new(root.Position + Vector3.new(math.cos(a) * rr, y, math.sin(a) * rr)) * CFrame.Angles(a, -a, 0)
+            local a = t * State.targetSpeed * 0.72 + i / n * math.pi * 4
+            local rr = State.targetRadius * (0.2 + (i / n) * 0.78)
+            local y = 0.25 + (i / n) * State.targetHeight + math.sin(t * 2 + i) * 0.1
+            p.CFrame = CFrame.new(root.Position + Vector3.new(math.cos(a) * rr, y, math.sin(a) * rr))
+                * CFrame.Angles(a, -a, 0)
             p.Color = colorAt(i, n)
-            p.Transparency = 0.08 + (math.sin(t * 3 + i) * 0.5 + 0.5) * 0.16
+            p.Transparency = 0.06 + (math.sin(t * 3 + i) * 0.5 + 0.5) * 0.13
         end
     else
         for i, p in ipairs(targetFX.parts) do
             local side = i <= 4 and -1 or 1
             local idx = ((i - 1) % 4) + 1
-            local a = t * State.targetSpeed * 0.5 + idx * 0.35
-            local y = 0.5 + (idx - 1) * 0.9
-            local x = side * (State.targetRadius * 0.72)
-            p.CFrame = CFrame.new(root.Position + Vector3.new(x, y, math.sin(a) * 0.55)) * CFrame.Angles(0, side * 0.25, 0)
+            local a = t * State.targetSpeed * 0.45
+            local y = 0.45 + (idx - 1) * 0.72
+            local x = side * State.targetRadius * 0.68
+            p.CFrame = CFrame.new(root.Position + Vector3.new(x, y, math.sin(a + idx) * 0.35))
+                * CFrame.Angles(0, side * 0.2, 0)
             p.Color = colorAt(i, n)
-            p.Transparency = 0.05 + (State.targetPulse and (math.sin(t * 4 + i) * 0.5 + 0.5) * 0.15 or 0)
+            p.Transparency = 0.04 + (State.targetPulse and (math.sin(t * 4 + i) * 0.5 + 0.5) * 0.1 or 0)
         end
     end
     if targetFX.label then
         targetFX.label.Visible = true
         targetFX.label.Text = State.targetName and ("TARGET  " .. target.DisplayName) or "TARGET"
-        targetFX.label.TextColor3 = State.targetRainbow and hue(t, 0, 0.2) or State.targetColor
+        targetFX.label.TextColor3 = State.targetRainbow and hue(t, 0, 0.18) or State.targetColor
         if targetFX.billboard then targetFX.billboard.Adornee = root end
     end
 end
@@ -1106,8 +1123,37 @@ local function updateGlow()
     if glowHL then glowHL.FillColor, glowHL.FillTransparency = State.glowColor, State.glowFill end
 end
 
+local antiFlingLastSafeCF
+local antiFlingLastSafeTime = 0
+local function stepAntiFling()
+    if not State.antiFling then
+        antiFlingLastSafeCF = nil
+        return
+    end
+    local r = Real.root
+    local h = Real.hum
+    if not (r and r.Parent and h and h.Parent) then return end
+    local lv = r.AssemblyLinearVelocity
+    local av = r.AssemblyAngularVelocity
+    local linear = lv.Magnitude
+    local angular = av.Magnitude
+    local now = os.clock()
+    if linear <= State.antiFlingMaxSpeed and angular <= State.antiFlingMaxAngular then
+        antiFlingLastSafeCF = r.CFrame
+        antiFlingLastSafeTime = now
+        return
+    end
+    r.AssemblyLinearVelocity = Vector3.zero
+    r.AssemblyAngularVelocity = Vector3.zero
+    if State.antiFlingRecovery and antiFlingLastSafeCF and now - antiFlingLastSafeTime < 0.45 then
+        local dist = (r.Position - antiFlingLastSafeCF.Position).Magnitude
+        if dist > 12 then r.CFrame = antiFlingLastSafeCF end
+    end
+end
+
 local stepAcc = 0
 local function stepReal(dt, t)
+    stepAntiFling()
     -- footsteps
     if State.steps and Real.root and Real.root.Parent then
         stepAcc += dt
@@ -1817,13 +1863,23 @@ function WIN.rowLabel(head, text, compact)
     })
 end
 function WIN.optsFrame(row, list)
+    local wrap = new("Frame", {
+        Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1, ClipsDescendants = true,
+        Visible = false, LayoutOrder = 2, Parent = row,
+    })
     local o = new("Frame", {
         Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = BLACK, BackgroundTransparency = 0.55,
-        Visible = false, LayoutOrder = 2, Parent = row,
+        Position = UDim2.fromOffset(0, 8), Parent = wrap,
     })
     new("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Parent = o })
     for i, sf in ipairs(list) do WIN.buildRow(sf, o, i, true) end
-    return o
+    o.Name = "Content"
+    task.defer(function()
+        if o.Parent then
+            wrap:SetAttribute("TargetHeight", o.AbsoluteSize.Y + 8)
+        end
+    end)
+    return wrap
 end
 
 Builders.toggle = function(f, parent, order, compact)
@@ -1835,7 +1891,7 @@ Builders.toggle = function(f, parent, order, compact)
     local val = State[f.key]
     local track = new("Frame", {
         AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.5, 0), Size = UDim2.fromOffset(34, 18),
-        BackgroundColor3 = val and WHITE or OFF, Parent = head,
+        BackgroundColor3 = val and State.accentColor or OFF, Parent = head,
     })
     corner(track, 9)
     local knob = new("Frame", {
@@ -1853,19 +1909,31 @@ Builders.toggle = function(f, parent, order, compact)
         gi.AnchorPoint, gi.Position = Vector2.new(0.5, 0.5), UDim2.fromScale(0.5, 0.5)
         gear.MouseButton1Click:Connect(function()
             local opening = not o.Visible
+            local inner = o:FindFirstChild("Content")
+            local targetH = o:GetAttribute("TargetHeight") or (inner and (inner.AbsoluteSize.Y + 8) or 40)
             o.Visible = opening
             tween(gi, 0.28, { Rotation = opening and -24 or 0 }, Enum.EasingStyle.Quad)
-            tintIcon(gi, opening and WHITE or GRAY)
+            tintIcon(gi, opening and State.accentColor or GRAY)
             if opening then
-                o.Position = UDim2.fromOffset(10, 5)
-                tween(o, 0.22, { Position = UDim2.fromOffset(0, 0) }, Enum.EasingStyle.Quad)
+                o.Size = UDim2.new(1, 0, 0, 0)
+                o.Position = UDim2.fromOffset(0, 0)
+                tween(o, 0.26, { Size = UDim2.new(1, 0, 0, targetH) }, Enum.EasingStyle.Quart)
+                inner.Position = UDim2.fromOffset(0, 8)
+                tween(inner, 0.28, { Position = UDim2.fromOffset(0, 0) }, Enum.EasingStyle.Quart)
+            else
+                tween(o, 0.2, { Size = UDim2.new(1, 0, 0, 0) }, Enum.EasingStyle.Quart)
+                tween(inner, 0.18, { Position = UDim2.fromOffset(0, -6) }, Enum.EasingStyle.Quad)
+                task.delay(0.2, function()
+                    if not o.Visible then return end
+                    o.Visible = false
+                end)
             end
         end)
     end
     head.MouseButton1Click:Connect(function()
         val = not val
         State[f.key] = val
-        tween(track, 0.15, { BackgroundColor3 = val and WHITE or OFF })
+        tween(track, 0.15, { BackgroundColor3 = val and State.accentColor or OFF })
         tween(knob, 0.15, { Position = val and UDim2.new(1, -15, 0.5, 0) or UDim2.new(0, 3, 0.5, 0), BackgroundColor3 = val and BLACK or GRAY })
         if f.on then f.on(val) end
         notify(f.name, val and "Enabled" or "Disabled")
@@ -1893,7 +1961,7 @@ Builders.slider = function(f, parent, order, compact)
         BackgroundColor3 = WHITE, BackgroundTransparency = 0.85, BorderSizePixel = 0, Parent = head,
     })
     corner(bar, 2)
-    local fill = new("Frame", { Size = UDim2.fromScale(frac0, 1), BackgroundColor3 = WHITE, BorderSizePixel = 0, Parent = bar })
+    local fill = new("Frame", { Size = UDim2.fromScale(frac0, 1), BackgroundColor3 = State.accentColor, BorderSizePixel = 0, Parent = bar })
     corner(fill, 2)
     local knob = new("Frame", {
         AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(frac0, 0, 0.5, 0), Size = UDim2.fromOffset(12, 12), BackgroundColor3 = WHITE, Parent = bar,
@@ -1942,7 +2010,7 @@ Builders.dropdown = function(f, parent, order, compact)
     for i, name in ipairs(f.values) do
         local ob = new("TextButton", {
             Size = UDim2.new(1, 0, 0, 28), BackgroundTransparency = 1, Text = name, Font = Enum.Font.GothamMedium, TextSize = 12,
-            TextColor3 = (State[f.key] == name) and WHITE or GRAY, TextXAlignment = Enum.TextXAlignment.Left, AutoButtonColor = false,
+            TextColor3 = (State[f.key] == name) and State.accentColor or GRAY, TextXAlignment = Enum.TextXAlignment.Left, AutoButtonColor = false,
             LayoutOrder = i, Parent = list,
         })
         new("UIPadding", { PaddingLeft = UDim.new(0, 26), Parent = ob })
@@ -1951,7 +2019,7 @@ Builders.dropdown = function(f, parent, order, compact)
             State[f.key] = name
             btn.Text = name
             list.Visible = false
-            for n, b in pairs(optBtns) do b.TextColor3 = (n == name) and WHITE or GRAY end
+            for n, b in pairs(optBtns) do b.TextColor3 = (n == name) and State.accentColor or GRAY end
             if f.on then f.on(name) end
         end)
     end
@@ -2260,7 +2328,15 @@ WIN.Pages = {
             T("Notifications", "notify"),
         } },
         { name = "Effects", features = {
-            T("China Hat", "hat", rebuildAll, { S("Size", "hatSize", 0.5, 2, 0.05, rebuildAll), S("Spin Speed", "hatSpin", 0, 8, 0.1), T("Rainbow", "hatRainbow"), CL("Color", "hatColor") }),
+            T("China Hat", "hat", rebuildAll, {
+    S("Size", "hatSize", 0.5, 2, 0.05, rebuildAll),
+    S("Height", "hatHeight", -0.4, 1.6, 0.05, rebuildAll),
+    S("Forward", "hatForward", -0.8, 0.8, 0.05, rebuildAll),
+    S("Side", "hatSide", -0.8, 0.8, 0.05, rebuildAll),
+    S("Spin Speed", "hatSpin", 0, 8, 0.1),
+    T("Rainbow", "hatRainbow"),
+    CL("Color", "hatColor")
+}),
             T("Halo", "halo", rebuildAll, { S("Height", "haloHeight", 0.6, 1.8, 0.05), T("Rainbow", "haloRainbow"), CL("Color", "haloColor") }),
             T("Orbiting Orbs", "orbs", rebuildAll, { S("Count", "orbCount", 2, 12, 1, rebuildAll), S("Radius", "orbRadius", 2, 6, 0.1), S("Speed", "orbSpeed", 0.2, 4, 0.1), T("Rainbow", "orbRainbow"), CL("Color", "orbColor") }),
             T("Ground Ring", "ring", rebuildAll, { S("Radius", "ringSize", 1.5, 7, 0.1), T("Rainbow", "ringRainbow"), CL("Color", "ringColor") }),
@@ -2417,6 +2493,13 @@ WIN.Pages = {
         } },
     } },
     { name = "Misc", icon = "music", groups = {
+        { name = "Protection", features = {
+            T("Anti Fling", "antiFling", nil, {
+                S("Max Speed", "antiFlingMaxSpeed", 40, 180, 5),
+                S("Max Angular", "antiFlingMaxAngular", 20, 180, 5),
+                T("Position Recovery", "antiFlingRecovery"),
+            }),
+        } },
         { name = "Music", features = {
             T("Player Widget", "music"),
             DD("Playlist", "musicTrack", { "Custom", "Raining Tacos", "Turtle", "Bossa Me", "Congratulations", "Morning Mood", "Four Seasons - Spring", "Classic Easter", "Science Mysteries", "Paradise Falls", "Life in an Elevator", "Chill Jazz", "Cool Vibes", "Gymnopedie No. 1", "Night Run" }, function(v) HUD.selectTrack(v) end),
@@ -2431,8 +2514,23 @@ WIN.Pages = {
             LB("Paste an audio asset ID and press Play. Only assets the game is allowed to load will play."),
         } },
     } },
+    { name = "Skin Changer", icon = "user", groups = {
+        { name = "Avatar", features = {
+            DD("Preset", "skinPreset", { "Default", "Ice", "Ghost", "Crimson", "Void", "Gold" }, function() applySkinPreset() end),
+            IN("User ID", "skinUserId", "Roblox User ID", function(v) applySkinByUserId(v) end),
+            BT("Apply Skin", "download", function()
+                if State.skinUserId ~= "" then applySkinByUserId(State.skinUserId) else applySkinPreset() end
+            end),
+            S("Visual Scale", "skinScale", 0.8, 1.2, 0.01, function(v)
+                if Real.model then pcall(function() Real.model:ScaleTo(v) end) end
+                if Prev.model then pcall(function() Prev.model:ScaleTo(v) end) end
+            end),
+            LB("Skin Changer is visual and applies the selected avatar appearance locally."),
+        } },
+    } },
     { name = "Settings", icon = "settings", groups = {
         { name = "Menu", features = {
+            CL("Accent Color", "accentColor", function() applyAccent() end),
             S("Opacity", "menuTransp", 0, 0.6, 0.02, WIN.updateMenuOpacity),
             T("Background Blur", "menuBlur", nil, { S("Amount", "blurAmt", 2, 30, 1) }),
             T("Dim Background", "dim"),
@@ -2505,9 +2603,9 @@ function WIN.selectTab(i)
     WIN.searching = false
     for j, n in ipairs(WIN.navs) do
         local on = (j == i)
-        tween(n.btn, 0.15, { BackgroundTransparency = on and 0.9 or 1 })
-        tween(n.label, 0.15, { TextColor3 = on and WHITE or GRAY })
-        tintIcon(n.icon, on and WHITE or GRAY)
+        tween(n.btn, 0.15, { BackgroundColor3 = State.accentColor, BackgroundTransparency = on and 0.84 or 1 })
+        tween(n.label, 0.15, { TextColor3 = on and State.accentColor or GRAY })
+        tintIcon(n.icon, on and State.accentColor or GRAY)
     end
     render()
     local base = WIN.contentPos
@@ -2551,6 +2649,7 @@ end
 bind(WIN.search:GetPropertyChangedSignal("Text"), function() if not WIN.searching then render() end end)
 bind(WIN.saveBtn.MouseButton1Click, WIN.saveConfig)
 bind(WIN.cfgBox.FocusLost, function() State.configName = WIN.cfgBox.Text ~= "" and WIN.cfgBox.Text or "default" end)
+task.defer(applyAccent)
 
 ---------------------------------------------------------------- preview clone
 refreshPreview = function()
@@ -2614,7 +2713,7 @@ WIN.launcher = new("TextButton", {
     BackgroundColor3 = BLACK, BackgroundTransparency = 0.3, Text = "", AutoButtonColor = false, ZIndex = 10, Parent = gui,
 })
 corner(WIN.launcher, 16)
-stroke(WIN.launcher, WHITE, 0.85)
+WIN.launcherStroke = stroke(WIN.launcher, State.accentColor, 0.75)
 WIN.lIc = icon(WIN.launcher, "eye", 14, WHITE)
 WIN.lIc.Position = UDim2.new(0, 14, 0.5, -7)
 WIN.lIc.ZIndex = 11
