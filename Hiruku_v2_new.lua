@@ -2737,19 +2737,31 @@ local launcherGui = gui
 local function launcherMetrics()
     local v = cam().ViewportSize
     local touch = UIS.TouchEnabled and not UIS.KeyboardEnabled
-    local compact = math.min(v.X, v.Y) < 620
+    local minSide = math.min(v.X, v.Y)
+    local compact = minSide < 620
     local scale = math.clamp(math.min(v.X / 900, v.Y / 700), 0.78, 1.05)
-    if touch then scale = math.clamp(math.min(v.X / 520, v.Y / 900), 0.82, 1.0) end
+    if touch then
+        scale = math.clamp(math.min(v.X / 520, v.Y / 900), 0.82, 1.0)
+    end
     if compact then scale = math.min(scale, 0.9) end
+
     local insetY = 0
     pcall(function()
-        local topLeft = GuiService:GetGuiInset()
-        insetY = topLeft.Y
+        local topLeft, bottomRight = GuiService:GetGuiInset()
+        if topLeft then insetY = math.max(0, topLeft.Y) end
     end)
-    local top = math.max(insetY + (touch and 7 or 8), 48)
-    local side = touch and 12 or 14
-    local w = touch and 108 or 118
+
+    local safeGap = touch and 8 or 10
+    local top = math.max(6, insetY + safeGap)
+    local side = touch and math.max(8, math.floor(v.X * 0.025)) or 14
+    local w = touch and math.clamp(v.X * 0.21, 96, 118) or 118
     local h = touch and 34 or 36
+
+    if v.X < 380 then
+        w = math.clamp(v.X * 0.29, 92, 108)
+        side = 8
+    end
+
     return scale, top, side, w, h
 end
 WIN.launcher = new("TextButton", {
@@ -2767,16 +2779,28 @@ new("TextLabel", {
 })
 function WIN.updateLauncher()
     if not WIN.launcher or not WIN.launcher.Parent then return end
+    local viewport = cam().ViewportSize
+    if viewport.X <= 1 or viewport.Y <= 1 then return end
+
     local scale, top, side, w, h = launcherMetrics()
-    WIN.launcher.Position = UDim2.fromOffset(side, top)
-    WIN.launcher.Size = UDim2.fromOffset(w * scale, h * scale)
-    WIN.lIc.Size = UDim2.fromOffset(15 * scale, 15 * scale)
-    WIN.lIc.Position = UDim2.fromOffset(12 * scale, (h * scale - 15 * scale) / 2)
+    local width = math.floor(w * scale + 0.5)
+    local height = math.floor(h * scale + 0.5)
+    local iconSize = math.max(13, math.floor(15 * scale + 0.5))
+
+    WIN.launcher.Position = UDim2.fromOffset(math.floor(side + 0.5), math.floor(top + 0.5))
+    WIN.launcher.Size = UDim2.fromOffset(width, height)
+
+    WIN.lIc.Size = UDim2.fromOffset(iconSize, iconSize)
+    WIN.lIc.Position = UDim2.fromOffset(
+        math.floor(12 * scale + 0.5),
+        math.floor((height - iconSize) / 2)
+    )
+
     local title = WIN.launcher:FindFirstChild("Title")
     if title then
-        title.Position = UDim2.fromOffset(34 * scale, 0)
-        title.Size = UDim2.new(1, -42 * scale, 1, 0)
-        title.TextSize = 14 * scale
+        title.Position = UDim2.fromOffset(math.floor(34 * scale + 0.5), 0)
+        title.Size = UDim2.new(1, -math.floor(42 * scale + 0.5), 1, 0)
+        title.TextSize = math.max(11, 14 * scale)
     end
 end
 WIN.updateLauncher()
