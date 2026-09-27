@@ -1337,10 +1337,13 @@ HUD.wmNamePill = HUD.pill(1, "code", "Hiruku")
 HUD.wmNamePill.Active = true
 HUD.wmNamePill.Selectable = true
 HUD.wmNamePill.ZIndex = 1000
-HUD.wmNamePill.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        WIN.setOpen(not WIN.menuOpen)
-    end
+local wmHit = new("TextButton", {
+    Name = "HirukuHitbox", Position = UDim2.fromScale(0, 0), Size = UDim2.fromScale(1, 1),
+    BackgroundTransparency = 1, Text = "", AutoButtonColor = false, Active = true, Selectable = true,
+    ZIndex = 1005, Parent = HUD.wmNamePill,
+})
+wmHit.MouseButton1Click:Connect(function()
+    WIN.setOpen(not WIN.menuOpen)
 end)
 HUD.wmUserPill, HUD.wmUserLbl = HUD.pill(2, "user", LP.DisplayName)
 HUD.wmFpsPill, HUD.wmFpsLbl = HUD.pill(3, "activity", "60 fps")
