@@ -1281,8 +1281,8 @@ end
 
 -- watermark
 HUD.wmHolder = new("Frame", {
-    AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -10, 0, 44), Size = UDim2.fromOffset(0, 26),
-    AutomaticSize = Enum.AutomaticSize.X, BackgroundTransparency = 1, Parent = hud,
+    AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 52), Size = UDim2.fromOffset(0, 28),
+    AutomaticSize = Enum.AutomaticSize.X, BackgroundTransparency = 1, ClipsDescendants = false, ZIndex = 40, Parent = hud,
 })
 new("UIListLayout", {
     FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Right,
@@ -1334,17 +1334,11 @@ function HUD.pill(order, iconName, text)
     return f, lbl
 end
 HUD.wmNamePill = HUD.pill(1, "code", "Hiruku")
-HUD.wmNamePill.Active = true
-HUD.wmNamePill.Selectable = true
-HUD.wmNamePill.ZIndex = 1000
-local wmHit = new("TextButton", {
-    Name = "HirukuHitbox", Position = UDim2.fromScale(0, 0), Size = UDim2.fromScale(1, 1),
-    BackgroundTransparency = 1, Text = "", AutoButtonColor = false, Active = true, Selectable = true,
-    ZIndex = 1005, Parent = HUD.wmNamePill,
-})
-wmHit.MouseButton1Click:Connect(function()
-    WIN.setOpen(not WIN.menuOpen)
-end)
+HUD.wmNamePill.ZIndex = 41
+HUD.wmNamePill.Active = false
+for _, d in ipairs(HUD.wmNamePill:GetDescendants()) do
+    if d:IsA("GuiObject") then d.ZIndex = 41 end
+end
 HUD.wmUserPill, HUD.wmUserLbl = HUD.pill(2, "user", LP.DisplayName)
 HUD.wmFpsPill, HUD.wmFpsLbl = HUD.pill(3, "activity", "60 fps")
 HUD.wmPingPill, HUD.wmPingLbl = HUD.pill(4, "wifi", "0 ms")
@@ -2750,31 +2744,25 @@ local launcherGui = gui
 local function launcherMetrics()
     local v = cam().ViewportSize
     local touch = UIS.TouchEnabled and not UIS.KeyboardEnabled
-    local minSide = math.min(v.X, v.Y)
-    local compact = minSide < 620
-    local scale = math.clamp(math.min(v.X / 900, v.Y / 700), 0.78, 1.05)
-    if touch then
-        scale = math.clamp(math.min(v.X / 520, v.Y / 900), 0.82, 1.0)
-    end
-    if compact then scale = math.min(scale, 0.9) end
-
     local insetY = 0
     pcall(function()
-        local topLeft, bottomRight = GuiService:GetGuiInset()
+        local topLeft = GuiService:GetGuiInset()
         if topLeft then insetY = math.max(0, topLeft.Y) end
     end)
-
-    local safeGap = touch and 8 or 10
-    local top = math.max(6, insetY + safeGap)
-    local side = touch and math.max(8, math.floor(v.X * 0.025)) or 14
-    local w = touch and math.clamp(v.X * 0.21, 96, 118) or 118
-    local h = touch and 34 or 36
-
-    if v.X < 380 then
-        w = math.clamp(v.X * 0.29, 92, 108)
-        side = 8
+    local minSide = math.min(v.X, v.Y)
+    local scale = math.clamp(minSide / 700, 0.78, 1.05)
+    local side = math.max(10, math.floor(v.X * 0.025))
+    local top = math.max(insetY + 6, 72)
+    local w = math.clamp(118 * scale, 96, 126)
+    local h = math.clamp(36 * scale, 32, 40)
+    if touch then
+        w = math.clamp(112 * scale, 98, 122)
+        h = math.clamp(38 * scale, 34, 42)
     end
-
+    if v.X < 420 then
+        side = 8
+        w = math.min(w, 108)
+    end
     return scale, top, side, w, h
 end
 WIN.launcher = new("TextButton", {
@@ -2820,7 +2808,7 @@ WIN.updateLauncher()
 bind(cam():GetPropertyChangedSignal("ViewportSize"), WIN.updateLauncher)
 bind(UIS:GetPropertyChangedSignal("TouchEnabled"), WIN.updateLauncher)
 bind(UIS:GetPropertyChangedSignal("KeyboardEnabled"), WIN.updateLauncher)
-bind(WIN.launcher.MouseButton1Click, function() WIN.setOpen(not WIN.menuOpen) end)
+bind(WIN.launcher.Activated, function() WIN.setOpen(not WIN.menuOpen) end)
 WIN.launcher:GetPropertyChangedSignal("Visible"):Connect(function()
     if not WIN.launcher.Visible then WIN.launcher.Visible = true end
 end)
